@@ -4,16 +4,24 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Simuladores Eletromagnetismo Aplicado</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #f1f5f9;
-      --surface: #ffffff;
-      --text: #0f172a;
-      --muted: #475569;
-      --primary: #0f4c81;
-      --primary-hover: #093357;
-      --accent: #0284c7;
-      --border: #e2e8f0;
+      --bg-dark: #140e0a;
+      --bg-panel: #211610;
+      --bg-card: linear-gradient(165deg, #2b1d15 0%, #1b120d 100%);
+      --parchment: #f3e5c8;
+      --parchment-muted: #cbb58d;
+      --brass-light: #e5b869;
+      --brass-mid: #b88234;
+      --brass-dark: #6b4614;
+      --copper: #c86d3b;
+      --copper-glow: #e88b52;
+      --verdigris: #4c9a8a;
+      --border-brass: rgba(229, 184, 105, 0.45);
+      --shadow-deep: 0 18px 40px rgba(0, 0, 0, 0.72);
     }
 
     * {
@@ -23,136 +31,501 @@
     }
 
     body {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background-color: var(--bg);
-      color: var(--text);
-      line-height: 1.5;
       min-height: 100vh;
-      display: flex;
-      flex-direction: column;
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      color: var(--parchment);
+      background-color: var(--bg-dark);
+      background-image:
+        radial-gradient(circle at 18% 12%, rgba(200, 109, 59, 0.16), transparent 42%),
+        radial-gradient(circle at 82% 18%, rgba(229, 184, 105, 0.12), transparent 45%),
+        radial-gradient(circle at 50% 100%, rgba(107, 70, 20, 0.25), transparent 55%),
+        repeating-linear-gradient(
+          0deg,
+          rgba(255, 224, 170, 0.018) 0px,
+          rgba(255, 224, 170, 0.018) 1px,
+          transparent 1px,
+          transparent 4px
+        );
+      padding: 28px 18px 48px;
+      position: relative;
+      overflow-x: hidden;
     }
 
-    header {
-      background: linear-gradient(135deg, #0f4c81 0%, #1e3a8a 100%);
-      color: #ffffff;
-      padding: 2.75rem 1.25rem;
-      text-align: center;
-      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+    /* Engrenagens decorativas sutis ao fundo */
+    .gear-bg {
+      position: fixed;
+      pointer-events: none;
+      opacity: 0.06;
+      z-index: 0;
+      color: var(--brass-light);
     }
 
-    header h1 {
-      font-size: clamp(1.75rem, 4vw, 2.5rem);
-      font-weight: 700;
-      margin-bottom: 0.65rem;
-      letter-spacing: -0.02em;
+    .gear-bg.left {
+      width: 360px;
+      height: 360px;
+      top: -90px;
+      left: -110px;
+      animation: spinSlow 60s linear infinite;
     }
 
-    .professor-info {
-      font-size: clamp(1rem, 2.2vw, 1.2rem);
-      font-weight: 500;
-      opacity: 0.95;
+    .gear-bg.right {
+      width: 420px;
+      height: 420px;
+      bottom: -130px;
+      right: -130px;
+      animation: spinReverse 75s linear infinite;
     }
 
-    main {
-      flex: 1;
-      max-width: 960px;
-      width: 100%;
+    @keyframes spinSlow {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes spinReverse {
+      from { transform: rotate(360deg); }
+      to { transform: rotate(0deg); }
+    }
+
+    .container {
+      max-width: 1080px;
       margin: 0 auto;
-      padding: 2.5rem 1.25rem;
+      position: relative;
+      z-index: 1;
     }
 
+    /* Placa principal em latão e couro */
+    .hero-plaque {
+      background:
+        linear-gradient(145deg, rgba(54, 35, 23, 0.96), rgba(26, 17, 12, 0.98));
+      border: 2px solid var(--brass-mid);
+      border-radius: 14px;
+      padding: 32px 28px 28px;
+      box-shadow:
+        var(--shadow-deep),
+        inset 0 0 0 1px rgba(243, 229, 200, 0.14),
+        inset 0 0 28px rgba(0, 0, 0, 0.65);
+      position: relative;
+      text-align: center;
+      margin-bottom: 34px;
+    }
+
+    /* Rebites nos cantos da placa */
+    .rivet {
+      position: absolute;
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #fff0c2, var(--brass-mid) 55%, #3a2308 100%);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.9), inset 0 0 1px rgba(255, 255, 255, 0.6);
+    }
+
+    .rivet.tl { top: 12px; left: 12px; }
+    .rivet.tr { top: 12px; right: 12px; }
+    .rivet.bl { bottom: 12px; left: 12px; }
+    .rivet.br { bottom: 12px; right: 12px; }
+
+    .badge-lab {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.78rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--brass-light);
+      background: rgba(184, 130, 52, 0.14);
+      border: 1px solid rgba(229, 184, 105, 0.4);
+      padding: 6px 14px;
+      border-radius: 999px;
+      margin-bottom: 16px;
+    }
+
+    .lamp-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #ffb347;
+      box-shadow: 0 0 10px #ff9d2e, 0 0 18px rgba(255, 157, 46, 0.75);
+    }
+
+    h1 {
+      font-family: 'Cinzel', Georgia, serif;
+      font-size: clamp(1.85rem, 4vw, 2.9rem);
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      line-height: 1.2;
+      color: var(--brass-light);
+      text-shadow:
+        0 2px 0 #3b2307,
+        0 6px 18px rgba(0, 0, 0, 0.85);
+      margin-bottom: 14px;
+    }
+
+    .author-box {
+      display: inline-block;
+      padding: 10px 20px;
+      border-top: 1px solid var(--border-brass);
+      border-bottom: 1px solid var(--border-brass);
+      margin-bottom: 14px;
+    }
+
+    .author-name {
+      font-size: 1.28rem;
+      font-weight: 700;
+      color: var(--parchment);
+      letter-spacing: 0.02em;
+    }
+
+    .institution {
+      font-size: 1.08rem;
+      font-style: italic;
+      color: var(--brass-light);
+    }
+
+    .subtitle {
+      max-width: 760px;
+      margin: 0 auto;
+      font-size: 1.18rem;
+      line-height: 1.55;
+      color: var(--parchment-muted);
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+
+    .section-header h2 {
+      font-family: 'Cinzel', Georgia, serif;
+      font-size: 1.25rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--brass-light);
+      white-space: nowrap;
+    }
+
+    .section-line {
+      flex: 1;
+      height: 2px;
+      background: linear-gradient(90deg, var(--brass-mid), rgba(229, 184, 105, 0.08));
+    }
+
+    /* Grade de cartões dos simuladores */
     .simulators-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 1.5rem;
+      grid-template-columns: repeat(auto-fit, minmax(295px, 1fr));
+      gap: 22px;
+      margin-bottom: 38px;
     }
 
-    .simulator-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 1.75rem 1.5rem;
+    .sim-card {
+      background: var(--bg-card);
+      border: 1.5px solid var(--border-brass);
+      border-radius: 12px;
+      padding: 22px 20px;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
+      gap: 18px;
+      box-shadow: var(--shadow-deep), inset 0 1px 0 rgba(255, 224, 163, 0.14);
+      transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+      position: relative;
+    }
+
+    .sim-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--brass-light);
+      box-shadow:
+        0 22px 44px rgba(0, 0, 0, 0.82),
+        0 0 22px rgba(229, 184, 105, 0.16);
+    }
+
+    .card-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .gauge-badge {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.74rem;
+      font-weight: 600;
+      color: var(--brass-light);
+      background: rgba(20, 14, 10, 0.75);
+      border: 1px solid rgba(229, 184, 105, 0.35);
+      border-radius: 6px;
+      padding: 4px 9px;
+      letter-spacing: 0.06em;
+    }
+
+    .new-tag {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: #e7fff8;
+      background: linear-gradient(135deg, #2d7a6b, #1d5449);
+      border: 1px solid rgba(118, 214, 194, 0.45);
+      border-radius: 6px;
+      padding: 4px 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .sim-title {
+      font-family: 'Cinzel', Georgia, serif;
+      font-size: 1.32rem;
+      font-weight: 700;
+      color: var(--parchment);
+      margin-top: 10px;
+      margin-bottom: 8px;
+    }
+
+    .sim-desc {
+      font-size: 1.08rem;
+      line-height: 1.48;
+      color: var(--parchment-muted);
+    }
+
+    .file-ref {
+      margin-top: 12px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.78rem;
+      color: var(--copper-glow);
+      opacity: 0.9;
+    }
+
+    /* Botão estilo chave/alavanca steampunk em latão e cobre */
+    .steam-btn {
+      display: flex;
       align-items: center;
-      text-align: center;
-      gap: 1.25rem;
-      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
-      transition: transform 0.18s ease, box-shadow 0.18s ease;
-    }
-
-    .simulator-card:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
-    }
-
-    .simulator-card h2 {
-      font-size: 1.2rem;
-      color: var(--text);
-      font-weight: 600;
-    }
-
-    .btn-simulador {
-      display: inline-block;
+      justify-content: center;
+      gap: 10px;
       width: 100%;
-      padding: 0.85rem 1.25rem;
-      background-color: var(--primary);
-      color: #ffffff;
+      padding: 13px 18px;
       text-decoration: none;
-      font-weight: 600;
-      font-size: 1rem;
-      border-radius: 10px;
-      transition: background-color 0.18s ease;
+      font-family: 'Cinzel', Georgia, serif;
+      font-size: 0.96rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #1a0f07;
+      background: linear-gradient(
+        180deg,
+        #f2c97d 0%,
+        #cf953e 52%,
+        #96621c 100%
+      );
+      border: 1.5px solid #ffdca0;
+      border-radius: 8px;
+      box-shadow:
+        0 5px 0 #4d2f09,
+        0 10px 18px rgba(0, 0, 0, 0.65),
+        inset 0 1px 0 rgba(255, 255, 255, 0.65);
+      transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.18s ease;
+      cursor: pointer;
     }
 
-    .btn-simulador:hover {
-      background-color: var(--primary-hover);
+    .steam-btn:hover {
+      filter: brightness(1.07);
+      background: linear-gradient(
+        180deg,
+        #fad691 0%,
+        #dca248 52%,
+        #a66d21 100%
+      );
+    }
+
+    .steam-btn:active {
+      transform: translateY(4px);
+      box-shadow:
+        0 1px 0 #4d2f09,
+        0 4px 8px rgba(0, 0, 0, 0.7),
+        inset 0 2px 4px rgba(0, 0, 0, 0.4);
+    }
+
+    .steam-btn.copper-accent {
+      background: linear-gradient(
+        180deg,
+        #f09b65 0%,
+        #c86d3b 52%,
+        #8a431d 100%
+      );
+      border-color: #ffc299;
+      color: #190b05;
+      box-shadow:
+        0 5px 0 #471e09,
+        0 10px 18px rgba(0, 0, 0, 0.65),
+        inset 0 1px 0 rgba(255, 255, 255, 0.55);
+    }
+
+    .steam-btn.copper-accent:hover {
+      filter: brightness(1.08);
+    }
+
+    .steam-btn.copper-accent:active {
+      transform: translateY(4px);
+      box-shadow:
+        0 1px 0 #471e09,
+        0 4px 8px rgba(0, 0, 0, 0.7);
     }
 
     footer {
       text-align: center;
-      padding: 1.5rem 1rem;
-      color: var(--muted);
-      font-size: 0.9rem;
-      border-top: 1px solid var(--border);
-      background: var(--surface);
+      padding: 20px 14px 8px;
+      border-top: 1px solid rgba(229, 184, 105, 0.25);
+      color: var(--parchment-muted);
+      font-size: 1.02rem;
+    }
+
+    footer span {
+      color: var(--brass-light);
+    }
+
+    @media (max-width: 560px) {
+      .hero-plaque {
+        padding: 24px 18px 22px;
+      }
+      .section-header h2 {
+        font-size: 1.02rem;
+      }
     }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Simuladores Eletromagnetismo Aplicado</h1>
-    <p class="professor-info">Professor Dr. Edval Rodrigues de Viveiros - Unisalesiano de Araçatuba</p>
-  </header>
+  <!-- Engrenagens decorativas de fundo -->
+  <svg class="gear-bg left" viewBox="0 0 100 100" fill="currentColor" aria-hidden="true">
+    <path d="M43 4h14l2 10c4 1 7 2 10 5l9-5 10 10-5 9c2 3 4 6 5 10l10 2v14l-10 2c-1 4-2 7-5 10l5 9-10 10-9-5c-3 2-6 4-10 5l-2 10H43l-2-10c-4-1-7-2-10-5l-9 5-10-10 5-9c-2-3-4-6-5-10L4 57V43l10-2c1-4 2-7 5-10l-5-9 10-10 9 5c3-2 6-4 10-5L43 4zm7 26a20 20 0 1 0 0 40 20 20 0 0 0 0-40z"/>
+  </svg>
 
-  <main>
-    <section class="simulators-grid" aria-label="Lista de simuladores">
-      <div class="simulator-card">
-        <h2>Simulador de Turbina Pelton</h2>
-        <a class="btn-simulador" href="./Turbina.html" target="_blank" rel="noopener noreferrer">
-          Simulador de Turbina Pelton
-        </a>
+  <svg class="gear-bg right" viewBox="0 0 100 100" fill="currentColor" aria-hidden="true">
+    <path d="M43 4h14l2 10c4 1 7 2 10 5l9-5 10 10-5 9c2 3 4 6 5 10l10 2v14l-10 2c-1 4-2 7-5 10l5 9-10 10-9-5c-3 2-6 4-10 5l-2 10H43l-2-10c-4-1-7-2-10-5l-9 5-10-10 5-9c-2-3-4-6-5-10L4 57V43l10-2c1-4 2-7 5-10l-5-9 10-10 9 5c3-2 6-4 10-5L43 4zm7 26a20 20 0 1 0 0 40 20 20 0 0 0 0-40z"/>
+  </svg>
+
+  <div class="container">
+    <header class="hero-plaque">
+      <div class="rivet tl"></div>
+      <div class="rivet tr"></div>
+      <div class="rivet bl"></div>
+      <div class="rivet br"></div>
+
+      <div class="badge-lab">
+        <span class="lamp-dot"></span>
+        Laboratório Virtual de Física &amp; Engenharia
       </div>
 
-      <div class="simulator-card">
-        <h2>Simulador de Transformador elétrico</h2>
-        <a class="btn-simulador" href="./Transformador.html" target="_blank" rel="noopener noreferrer">
-          Simulador de Transformador elétrico
-        </a>
+      <h1>Simuladores Eletromagnetismo Aplicado</h1>
+
+      <div class="author-box">
+        <div class="author-name">Professor Dr. Edval Rodrigues de Viveiros</div>
+        <div class="institution">UniSALESIANO de Araçatuba</div>
       </div>
 
-      <div class="simulator-card">
-        <h2>Simulador de Motor trifásico</h2>
-        <a class="btn-simulador" href="./Motor.html" target="_blank" rel="noopener noreferrer">
-          Simulador de Motor trifásico
-        </a>
-      </div>
-    </section>
-  </main>
+      <p class="subtitle">
+        Coleção interativa de simuladores educacionais voltados a estudantes do ensino médio e de engenharia,
+        explorando conversão eletromecânica, campos magnéticos, geração de energia e máquinas elétricas.
+      </p>
+    </header>
 
-  <footer>
-    Simuladores Eletromagnetismo Aplicado • Professor Dr. Edval Rodrigues de Viveiros - Unisalesiano de Araçatuba
-  </footer>
+    <div class="section-header">
+      <h2>Painel de Instrumentos</h2>
+      <div class="section-line"></div>
+    </div>
+
+    <main class="simulators-grid">
+      <!-- 1. Turbina Pelton -->
+      <article class="sim-card">
+        <div>
+          <div class="card-top">
+            <span class="gauge-badge">UNID. 01 • HIDRODINÂMICA</span>
+          </div>
+          <h3 class="sim-title">Turbina Pelton</h3>
+          <p class="sim-desc">
+            Simulação interativa de turbina hidráulica de ação, analisando jato d'água, pás em concha e conversão de energia.
+          </p>
+          <div class="file-ref">Arquivo: ./Turbina.html</div>
+        </div>
+        <a class="steam-btn" href="./Turbina.html" target="_blank" rel="noopener noreferrer">
+          <span>⚙</span> Abrir Turbina Pelton
+        </a>
+      </article>
+
+      <!-- 2. Transformador Elétrico -->
+      <article class="sim-card">
+        <div>
+          <div class="card-top">
+            <span class="gauge-badge">UNID. 02 • INDUÇÃO</span>
+          </div>
+          <h3 class="sim-title">Transformador Elétrico</h3>
+          <p class="sim-desc">
+            Exploração do acoplamento magnético entre enrolamentos primário e secundário, relação de espiras e transformação de tensão.
+          </p>
+          <div class="file-ref">Arquivo: ./Transformador.html</div>
+        </div>
+        <a class="steam-btn" href="./Transformador.html" target="_blank" rel="noopener noreferrer">
+          <span>⚡</span> Abrir Transformador
+        </a>
+      </article>
+
+      <!-- 3. Motor Trifásico -->
+      <article class="sim-card">
+        <div>
+          <div class="card-top">
+            <span class="gauge-badge">UNID. 03 • CAMPO GIRANTE</span>
+          </div>
+          <h3 class="sim-title">Motor Trifásico</h3>
+          <p class="sim-desc">
+            Visualização do campo magnético girante gerado por correntes trifásicas defasadas e acionamento do rotor.
+          </p>
+          <div class="file-ref">Arquivo: ./Motor.html</div>
+        </div>
+        <a class="steam-btn" href="./Motor.html" target="_blank" rel="noopener noreferrer">
+          <span>⚙</span> Abrir Motor Trifásico
+        </a>
+      </article>
+
+      <!-- 4. Turbina Didática -->
+      <article class="sim-card">
+        <div>
+          <div class="card-top">
+            <span class="gauge-badge">UNID. 04 • DIDÁTICA</span>
+            <span class="new-tag">Novo</span>
+          </div>
+          <h3 class="sim-title">Turbina Didática</h3>
+          <p class="sim-desc">
+            Bancada didática para experimentação visual do princípio de funcionamento e parâmetros operacionais da turbina.
+          </p>
+          <div class="file-ref">Arquivo: ./Turbinadidatica.html</div>
+        </div>
+        <a class="steam-btn copper-accent" href="./Turbinadidatica.html" target="_blank" rel="noopener noreferrer">
+          <span>⚙</span> Abrir Turbina Didática
+        </a>
+      </article>
+
+      <!-- 5. Motor Tesla -->
+      <article class="sim-card">
+        <div>
+          <div class="card-top">
+            <span class="gauge-badge">UNID. 05 • ELETROMAGNETISMO</span>
+            <span class="new-tag">Novo</span>
+          </div>
+          <h3 class="sim-title">Motor Tesla</h3>
+          <p class="sim-desc">
+            Simulação inspirada nos princípios de correntes alternadas polifásicas e rotação eletromagnética de Tesla.
+          </p>
+          <div class="file-ref">Arquivo: ./Teslamotor.html</div>
+        </div>
+        <a class="steam-btn copper-accent" href="./Teslamotor.html" target="_blank" rel="noopener noreferrer">
+          <span>⚡</span> Abrir Motor Tesla
+        </a>
+      </article>
+    </main>
+
+    <footer>
+      Acesso gratuito para fins educacionais • <span>Simuladores Eletromagnetismo Aplicado</span> — GitHub Pages
+    </footer>
+  </div>
 </body>
 </html>
