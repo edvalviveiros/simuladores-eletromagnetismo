@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Turbina Pelton 3D - Geometria Realista</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; background-color: #111; color: white; }
+        #canvas-container { width: 100vw; height: 100vh; display: block; }
+        
+        .ui-panel {
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+            background: rgba(10, 25, 30, 0.9); backdrop-filter: blur(10px);
+            border: 1px solid #008FA3; border-radius: 15px; padding: 20px 40px;
+            display: flex; gap: 50px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); z-index: 10;
+        }
+        .control-group { display: flex; flex-direction: column; align-items: center; width: 200px; }
+        .control-group label { font-size: 14px; color: #00E5FF; margin-bottom: 10px; font-weight: bold; text-transform: uppercase; }
+        
+        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; height: 24px; width: 24px; border-radius: 50%;
+            background: #fff; cursor: pointer; margin-top: -9px; box-shadow: 0 0 10px #00E5FF;
+        }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 6px; background: #333; border-radius: 3px; border: 1px solid #555; }
+        
+        .value-display {
+            margin-top: 10px; font-family: 'Courier New', monospace; font-size: 20px;
+            color: #fff; background: #000; padding: 5px 15px; border-radius: 5px;
+            border: 1px solid #444; min-width: 80px; text-align: center;
+        }
+        
+        .ihm-panel {
+            position: absolute; top: 30px; right: 30px; background: #1a1a1a;
+            border: 2px solid #444; border-radius: 10px; padding: 15px; width: 220px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5); z-index: 10;
+        }
+        .ihm-display {
+            background: #000; border: 1px solid #4CAF50; border-radius: 5px;
+            padding: 10px; text-align: center; margin-bottom: 10px;
+            color: #4CAF50; font-family: 'Courier New', monospace;
+        }
+        .ihm-display h4 { margin: 0 0 5px 0; font-size: 12px; color: #888; }
+        .ihm-display span { font-size: 28px; font-weight: bold; text-shadow: 0 0 5px #4CAF50; }
+        
+        .btn-audio {
+            position: absolute; top: 30px; left: 30px; background: #333; color: #fff;
+            border: 1px solid #555; padding: 12px 24px; border-radius: 8px;
+            cursor: pointer; font-size: 14px; z-index: 10; transition: all 0.3s;
+        }
+        .btn-audio:hover { background: #008FA3; }
+        .btn-audio.ativo { background: #4CAF50; color: #000; border-color: #4CAF50; }
+
+        .alerta {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(255, 0, 0, 0.9); color: white; padding: 20px 40px;
+            border-radius: 10px; font-size: 24px; font-weight: bold; display: none;
+            z-index: 20; animation: piscar 0.5s infinite alternate; box-shadow: 0 0 50px red;
+        }
+        @keyframes piscar { from { opacity: 1; } to { opacity: 0.6; } }
+    </style>
+</head>
+<body>
+
+<button class="btn-audio" id="btnAudio" onclick="toggleAudio()">🔇 Ativar Som</button>
+
+<div class="ihm-panel">
+    <div class="ihm-display"><h4>ROTAÇÃO</h4><span id="txtRPM">0</span> <small>RPM</small></div>
+    <div class="ihm-display"><h4>POTÊNCIA</h4><span id="txtPotencia">0.0</span> <small>kW</small></div>
+    <div class="ihm-display"><h4>VAZÃO</h4><span id="txtVazao">0</span> <small>%</small></div>
+</div>
+
+<div class="ui-panel">
+    <div class="control-group">
+        <label>Abertura da Agulha (Vazão)</label>
+        <input type="range" id="rangeVazao" min="0" max="100" value="0">
+        <div class="value-display" id="valVazao">0%</div>
+    </div>
+    <div class="control-group">
+        <label>Carga do Freio (Torque)</label>
+        <input type="range" id="rangeCarga" min="0" max="100" value="20">
+        <div class="value-display" id="valCarga">20%</div>
+    </div>
+</div>
+
+<div class="alerta" id="alerta">⚠️ SOBRECARGA: TURBINA PARADA</div>
+<div id="canvas-container"></div>
+
+<script type="importmap">
+{
+    "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+}
+</script>
+
+<script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // ==========================================
+    // 1. CENA, CÂMERA E RENDERIZADOR
+    // ==========================================
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a1a1a);
+    scene.fog = new THREE.Fog(0x1a1a1a, 15, 40);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(8, 6, 10);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.2;
+    container.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 2.5, 0);
+    controls.enableDamping = true;
+    controls.maxPolarAngle = Math.PI / 2 + 0.1;
+
+    // ==========================================
+    // 2. ILUMINAÇÃO
+    // ==========================================
+    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+    
+    const mainLight = new THREE.DirectionalLight(0xffffff, 2.5);
+    mainLight.position.set(5, 10, 7);
+    mainLight.castShadow = true;
+    mainLight.shadow.mapSize.width = 2048;
+    mainLight.shadow.mapSize.height = 2048;
+    mainLight.shadow.camera.near = 0.5;
+    mainLight.shadow.camera.far = 30;
+    scene.add(mainLight);
+
+    const rimLight = new THREE.DirectionalLight(0x00E5FF, 1.5);
+    rimLight.position.set(-5, 5, -5);
+    scene.add(rimLight);
+
+    // Chão
+    const ground = new THREE.Mesh(
+        new THREE.PlaneGeometry(100, 100),
+        new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.9 })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    // ==========================================
+    // 3. MATERIAIS
+    // ==========================================
+    const steelMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.9, roughness: 0.25, side: THREE.DoubleSide });
+    const darkMetalMat = new THREE.MeshStandardMaterial({ color: 0x555555, metalness: 0.8, roughness: 0.4 });
+    const bancadaMat = new THREE.MeshStandardMaterial({ color: 0x006D7D, roughness: 0.5, metalness: 0.2 });
+    const glassMat = new THREE.MeshStandardMaterial({ 
+        color: 0x00E5FF, transparent: true, opacity: 0.15, 
+        roughness: 0.1, metalness: 0.1, side: THREE.DoubleSide 
+    });
+
+    // ==========================================
+    // 4. BANCADA
+    // ==========================================
+    const bancadaGroup = new THREE.Group();
+    
+    // Base principal
+    const base = new THREE.Mesh(new THREE.BoxGeometry(10, 3, 4), bancadaMat);
+    base.position.y = 1.5;
+    base.castShadow = true; base.receiveShadow = true;
+    bancadaGroup.add(base);
+
+    // Faixa clara frontal
+    const faixa = new THREE.Mesh(new THREE.BoxGeometry(10.1, 0.6, 4.1), new THREE.MeshStandardMaterial({ color: 0x00B8D4 }));
+    faixa.position.y = 2.2;
+    bancadaGroup.add(faixa);
+
+    // Tela IHM
+    const tela = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.2), new THREE.MeshStandardMaterial({ color: 0x111111, emissive: 0x004400 }));
+    tela.position.set(5.05, 2.5, 0);
+    tela.rotation.y = Math.PI / 2;
+    bancadaGroup.add(tela);
+
+    scene.add(bancadaGroup);
+
+    // ==========================================
+    // 5. CONSTRUÇÃO DA TURBINA PELTON (GEOMETRIA PARAMÉTRICA)
+    // ==========================================
+    const turbinaGroup = new THREE.Group();
+    turbinaGroup.position.set(-1, 4.5, 0);
+
+    // --- 5.1. EIXO E DISCO CENTRAL ---
+    const eixo = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 5, 32), steelMat);
+    eixo.rotation.z = Math.PI / 2;
+    eixo.castShadow = true;
+    turbinaGroup.add(eixo);
+
+    const disco = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 0.3, 64), darkMetalMat);
+    disco.rotation.z = Math.PI / 2;
+    disco.castShadow = true;
+    turbinaGroup.add(disco);
+
+    // --- 5.2. FUNÇÃO PARA CRIAR UMA CONCHA PELTON REALISTA ---
+    // Constrói a concha como uma superfície paramétrica (malha de pontos)
+    function createPeltonBucket() {
+        // Parâmetros da concha
+        const width = 0.8;      // Largura total da concha
+        const length = 1.0;     // Comprimento (profundidade) da concha
+        const depth = 0.5;      // Profundidade da cavidade
+        const segmentsU = 20;   // Segmentos ao longo do comprimento
+        const segmentsV = 20;   // Segmentos ao longo da largura
+        
+        const vertices = [];
+        const indices = [];
+        const normals = [];
+        const uvs = [];
+
+        // Gerar a superfície superior (a "colher" côncava)
+        // A concha é dividida em duas metades pela aresta central (em x=0)
+        // Cada metade é uma curva que desce em direção ao centro e sobe nas bordas
+        
+        for (let i = 0; i <= segmentsU; i++) {
+            const u = i / segmentsU; // 0 a 1 ao longo do comprimento
+            const z = (u - 0.5) * length; // Posição Z (comprimento)
+            
+            // Perfil de profundidade: mais fundo no meio, raso nas pontas
+            const depthProfile = Math.sin(u * Math.PI) * depth;
+            
+            for (let j = 0; j <= segmentsV; j++) {
+                const v = j / segmentsV; // 0 a 1 ao longo da largura
+                
+                // x vai de -width/2 a +width/2
+                const x = (v - 0.5) * width;
+                
+                // A curvatura da concha: 
+                // y é a altura. O centro (x=0) é mais baixo (a aresta divisora)
+                // As bordas (x = +/- width/2) são mais altas
+                const xNorm = Math.abs(x) / (width/2); // 0 no centro, 1 nas bordas
+                
+                // Perfil da seção transversal: parábola que forma a cavidade
+                // Quanto mais longe do centro, mais alto sobe a borda da concha
+                const y = -depthProfile + (xNorm * xNorm * depth * 0.8);
+                
+                vertices.push(x, y, z);
+                
+                // UVs aproximados
+                uvs.push(v, u);
+            }
+        }
+
+        // Gerar os índices (conectar os vértices em triângulos)
+        for (let i = 0; i < segmentsU; i++) {
+            for (let j = 0; j < segmentsV; j++) {
+                const a = i * (segmentsV + 1) + j;
+                const b = i * (segmentsV + 1) + j + 1;
+                const c = (i + 1) * (segmentsV + 1) + j;
+                const d = (i + 1) * (segmentsV + 1) + j + 1;
+
+                // Dois triângulos por quad
+                indices.push(a, b, c);
+                indices.push(b, d, c);
+            }
+        }
+
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+        geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+        geometry.setIndex(indices);
+        geometry.computeVertexNormals(); // Calcula as normais para iluminação correta
+        
+        return geometry;
+    }
+
+    const bucketGeo = createPeltonBucket();
+
+    // --- 5.3. MONTAGEM DAS CONCHAS ---
+    const numConchas = 18;
+    for (let i = 0; i < numConchas; i++) {
+        const concha = new THREE.Mesh(bucketGeo, steelMat);
+        concha.castShadow = true;
+        
+        // Ângulo ao redor do disco
+        const angle = (i / numConchas) * Math.PI * 2;
+        
+        // Posição no disco
+        concha.position.x = Math.cos(angle) * 1.3;
+        concha.position.y = Math.sin(angle) * 1.3;
+        
+        // Rotação para orientar a concha:
+        // 1. Aponta para fora do disco
+        concha.rotation.z = angle;
+        // 2. Inclina a concha para receber o jato
+        concha.rotation.x = Math.PI / 2.2;
+        // 3. Ajuste fino da orientação
+        concha.rotation.y = Math.PI / 4;
+
+        turbinaGroup.add(concha);
+    }
+
+    // --- 5.4. CARENAGEM (CASING) TRANSLÚCIDA ---
+    const carenagemGeo = new THREE.CylinderGeometry(2.5, 2.5, 1.8, 32, 1, true, 0, Math.PI * 1.5);
+    const carenagem = new THREE.Mesh(carenagemGeo, glassMat);
+    carenagem.rotation.z = Math.PI / 2;
+    carenagem.rotation.y = Math.PI;
+    turbinaGroup.add(carenagem);
+
+    bancadaGroup.add(turbinaGroup);
+
+    // ==========================================
+    // 6. SISTEMA DE ÁGUA (BICO E JATO)
+    // ==========================================
+    const aguaGroup = new THREE.Group();
+    aguaGroup.position.set(-4, 4.5, 0);
+
+    // Cano de Água
+    const cano = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 3, 32), darkMetalMat);
+    cano.rotation.z = Math.PI / 2;
+    cano.position.x = -1;
+    cano.castShadow = true;
+    aguaGroup.add(cano);
+
+    // Válvula Amarela
+    const valvula = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.8, 0.6), new THREE.MeshStandardMaterial({ color: 0xFDD835 }));
+    valvula.position.set(-1.5, 0.6, 0);
+    valvula.castShadow = true;
+    aguaGroup.add(valvula);
+
+    // Bico Injetor (Cônico)
+    const bico = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.5, 32), steelMat);
+    bico.rotation.z = -Math.PI / 2;
+    bico.position.x = 0.6;
+    aguaGroup.add(bico);
+
+    bancadaGroup.add(aguaGroup);
+
+    // Jato de Água Principal
+    const jatoGeo = new THREE.CylinderGeometry(0.08, 0.08, 1, 8);
+    const jatoMat = new THREE.MeshStandardMaterial({ 
+        color: 0x00AAFF, transparent: true, opacity: 0.8, emissive: 0x0055ff 
+    });
+    const jato = new THREE.Mesh(jatoGeo, jatoMat);
+    jato.rotation.z = -Math.PI / 2;
+    jato.position.set(-3.2, 4.5, 0);
+    bancadaGroup.add(jato);
+
+    // Respingo (Jato refletido que sai da concha)
+    const respingoGeo = new THREE.CylinderGeometry(0.05, 0.15, 1, 8);
+    const respingo = new THREE.Mesh(respingoGeo, jatoMat);
+    respingo.rotation.z = Math.PI / 2;
+    respingo.position.set(-1, 4.5, 0);
+    respingo.visible = false;
+    bancadaGroup.add(respingo);
+
+    // ==========================================
+    // 7. ESTADO E UI
+    // ==========================================
+    let rpm = 0, potencia = 0, vazao = 0, carga = 20, anguloTurbina = 0, audioAtivo = false;
+    
+    const rangeVazao = document.getElementById('rangeVazao');
+    const rangeCarga = document.getElementById('rangeCarga');
+    const valVazaoUI = document.getElementById('valVazao');
+    const valCargaUI = document.getElementById('valCarga');
+    const txtRPM = document.getElementById('txtRPM');
+    const txtPotencia = document.getElementById('txtPotencia');
+    const txtVazao = document.getElementById('txtVazao');
+    const alerta = document.getElementById('alerta');
+
+    rangeVazao.addEventListener('input', (e) => { vazao = parseInt(e.target.value); valVazaoUI.innerText = vazao + '%'; });
+    rangeCarga.addEventListener('input', (e) => { carga = parseInt(e.target.value); valCargaUI.innerText = carga + '%'; });
+
+    // ==========================================
+    // 8. ÁUDIO
+    // ==========================================
+    let audioCtx, oscMotor, ganhoMotor, fonteRuido, ganhoAgua;
+
+    function initAudio() {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        oscMotor = audioCtx.createOscillator();
+        oscMotor.type = 'sawtooth';
+        oscMotor.frequency.value = 40;
+        ganhoMotor = audioCtx.createGain();
+        ganhoMotor.gain.value = 0;
+        let filtroMotor = audioCtx.createBiquadFilter();
+        filtroMotor.type = 'lowpass';
+        filtroMotor.frequency.value = 400;
+        oscMotor.connect(filtroMotor); filtroMotor.connect(ganhoMotor); ganhoMotor.connect(audioCtx.destination);
+        oscMotor.start();
+
+        let bufferSize = audioCtx.sampleRate * 2;
+        let buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        let data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+        fonteRuido = audioCtx.createBufferSource();
+        fonteRuido.buffer = buffer; fonteRuido.loop = true;
+        let filtroAgua = audioCtx.createBiquadFilter();
+        filtroAgua.type = 'bandpass'; filtroAgua.frequency.value = 1200; filtroAgua.Q.value = 0.5;
+        ganhoAgua = audioCtx.createGain(); ganhoAgua.gain.value = 0;
+        fonteRuido.connect(filtroAgua); filtroAgua.connect(ganhoAgua); ganhoAgua.connect(audioCtx.destination);
+        fonteRuido.start();
+    }
+
+    window.toggleAudio = function() {
+        const btn = document.getElementById('btnAudio');
+        if (!audioAtivo) {
+            if (!audioCtx) initAudio();
+            audioCtx.resume().then(() => {
+                audioAtivo = true; btn.innerText = "🔊 Som Ativo"; btn.classList.add('ativo');
+            });
+        } else {
+            audioAtivo = false; btn.innerText = "🔇 Ativar Som"; btn.classList.remove('ativo');
+            if(ganhoMotor) ganhoMotor.gain.value = 0;
+            if(ganhoAgua) ganhoAgua.gain.value = 0;
+        }
+    };
+
+    // ==========================================
+    // 9. LOOP DE ANIMAÇÃO
+    // ==========================================
+    const clock = new THREE.Clock();
+
+    function animate() {
+        requestAnimationFrame(animate);
+        const delta = clock.getDelta();
+
+        // Física
+        let forcaAgua = vazao * 18;
+        let resistencia = (carga / 100) * 1800;
+
+        if (forcaAgua > resistencia) {
+            rpm += (forcaAgua - resistencia) * 0.02;
+            alerta.style.display = 'none';
+        } else {
+            rpm -= (resistencia - forcaAgua) * 0.05;
+        }
+
+        if (rpm < 0) rpm = 0;
+        if (rpm > 2000) rpm = 2000;
+        potencia = (rpm * (carga/100) * 0.0008);
+
+        // UI
+        txtRPM.innerText = Math.round(rpm);
+        txtPotencia.innerText = potencia.toFixed(2);
+        txtVazao.innerText = vazao;
+
+        // Rotação da Turbina (Eixo X)
+        let velocidadeAngular = rpm * 0.005;
+        anguloTurbina += velocidadeAngular;
+        turbinaGroup.rotation.x = anguloTurbina;
+
+        // Jato de Água
+        let comprimentoJato = 0.1 + (vazao / 100) * 2.8;
+        jato.scale.y = comprimentoJato;
+        jato.position.x = -3.2 + (comprimentoJato / 2);
+        jato.material.opacity = vazao > 0 ? 0.8 : 0;
+        
+        // Respingo (simula o jato dividido pela aresta)
+        respingo.visible = vazao > 10;
+        if (respingo.visible) {
+            let comprimentoRespingo = (vazao / 100) * 1.5;
+            respingo.scale.y = comprimentoRespingo;
+            respingo.position.x = -1 - (comprimentoRespingo / 2);
+            respingo.material.opacity = (vazao / 100) * 0.6;
+        }
+
+        // Alerta
+        if (rpm < 10 && vazao > 50 && carga > 80) alerta.style.display = 'block';
+        else alerta.style.display = 'none';
+
+        // Áudio
+        if (audioAtivo && audioCtx.state === 'running') {
+            oscMotor.frequency.setTargetAtTime(40 + (rpm * 0.1), audioCtx.currentTime, 0.1);
+            ganhoMotor.gain.setTargetAtTime(Math.min(0.15, (rpm / 2000) * 0.2), audioCtx.currentTime, 0.1);
+            ganhoAgua.gain.setTargetAtTime((vazao / 100) * 0.1, audioCtx.currentTime, 0.1);
+        }
+
+        // Vibração
+        if (rpm > 1000) {
+            let intensidade = (rpm / 2000) * 0.015;
+            bancadaGroup.position.x = (Math.random() - 0.5) * intensidade;
+            bancadaGroup.position.y = (Math.random() - 0.5) * intensidade;
+        } else {
+            bancadaGroup.position.x = 0; bancadaGroup.position.y = 0;
+        }
+
+        controls.update();
+        renderer.render(scene, camera);
+    }
+
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    animate();
+</script>
+</body>
+</html>

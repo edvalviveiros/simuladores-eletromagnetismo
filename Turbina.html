@@ -1,0 +1,1741 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador Didático - Bancada de Turbina Pelton (MF15)</title>
+    <!-- Tailwind CSS para interface responsiva e limpa -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js r128 para cena 3D WebGL -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Fontes Inter e JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+            user-select: none;
+            background-color: #0f172a;
+        }
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 8px;
+            border-radius: 999px;
+            background: #cbd5e1;
+            outline: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #0284c7;
+            border: 3px solid #ffffff;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+            cursor: pointer;
+            transition: transform 0.15s ease, background-color 0.15s ease;
+        }
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+            background: #0369a1;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #0284c7;
+            border: 3px solid #ffffff;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+            cursor: pointer;
+        }
+        .custom-scroll::-webkit-scrollbar {
+            width: 5px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.5);
+            border-radius: 999px;
+        }
+        @keyframes pulse-red {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            50% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+        }
+        .emergency-active {
+            animation: pulse-red 1.2s infinite;
+        }
+    </style>
+</head>
+<body class="w-screen h-screen relative bg-slate-900 text-slate-800">
+
+    <!-- Container principal da visualização 3D / Fallback 2D -->
+    <div id="canvas-container" class="w-full h-full relative cursor-grab active:cursor-grabbing"></div>
+
+    <!-- Barra superior com título institucional, presets de câmera e áudio -->
+    <header class="fixed top-3 left-3 right-3 z-20 pointer-events-none flex flex-wrap items-center justify-between gap-2">
+        <div class="pointer-events-auto bg-white/95 backdrop-blur-md border border-slate-200/80 shadow-lg rounded-2xl px-4 py-2.5 flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-700 to-cyan-600 flex items-center justify-center text-white font-extrabold shadow-inner">
+                MF15
+            </div>
+            <div>
+                <div class="flex items-center gap-2">
+                    <h1 class="text-sm sm:text-base font-extrabold text-slate-800 tracking-tight">
+                        Bancada Didática — Turbina Pelton
+                    </h1>
+                    <span id="status-badge" class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600 uppercase tracking-wider">
+                        Standby
+                    </span>
+                </div>
+                <p class="text-[11px] sm:text-xs text-slate-500">
+                    Unisalesiano de Araçatuba • Turbina Hidráulica de Ação Tangencial
+                </p>
+            </div>
+        </div>
+
+        <div class="pointer-events-auto bg-white/95 backdrop-blur-md border border-slate-200/80 shadow-lg rounded-2xl p-1.5 flex flex-wrap items-center gap-1">
+            <button onclick="setCameraPreset('overview')" id="cam-overview" class="cam-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-teal-700 text-white shadow-sm transition">
+                Vista Geral
+            </button>
+            <button onclick="setCameraPreset('rotor')" id="cam-rotor" class="cam-btn px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition">
+                Rotor & Jato
+            </button>
+            <button onclick="setCameraPreset('injector')" id="cam-injector" class="cam-btn px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition">
+                Linha Hidráulica
+            </button>
+            <button onclick="setCameraPreset('top')" id="cam-top" class="cam-btn px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition">
+                IHM / Reservatório
+            </button>
+
+            <div class="h-5 w-px bg-slate-200 mx-1"></div>
+
+            <!-- Controle de Áudio e Volume Mestre -->
+            <div class="flex items-center gap-1.5 bg-slate-100 px-2.5 py-1 rounded-xl border border-slate-200/80">
+                <button onclick="toggleAudioMute()" id="btn-audio-toggle" class="flex items-center gap-1 text-xs font-bold text-teal-800 hover:text-teal-600 transition" title="Ativar/Silenciar Síntese Sonora da Turbina">
+                    <span id="audio-icon">🔊</span>
+                    <span id="audio-label" class="hidden sm:inline">Som ON</span>
+                </button>
+                <input type="range" id="slider-volume" min="0" max="100" step="1" value="65" oninput="updateAudioVolume()" class="w-14 sm:w-16 !h-1.5" title="Volume Mestre">
+            </div>
+
+            <div class="h-5 w-px bg-slate-200 mx-1"></div>
+
+            <button onclick="toggleLeftPanel()" class="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition" title="Mostrar/Ocultar Controles">
+                Controles
+            </button>
+            <button onclick="toggleRightPanel()" class="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition" title="Mostrar/Ocultar IHM">
+                IHM / Gráficos
+            </button>
+        </div>
+    </header>
+
+    <!-- Painel Esquerdo: Comandos da Bancada e Variáveis Experimentais -->
+    <aside id="left-panel" class="fixed top-20 left-3 bottom-14 w-80 sm:w-88 max-w-[calc(100vw-1.5rem)] z-20 bg-white/95 backdrop-blur-md border border-slate-200/90 shadow-2xl rounded-2xl flex flex-col transition-transform duration-300">
+        <div class="px-4 py-3 border-b border-slate-200/80 flex items-center justify-between bg-slate-50/80 rounded-t-2xl">
+            <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-teal-600"></span>
+                <h2 class="text-xs font-bold uppercase tracking-wider text-slate-700">Painel de Comando da Bancada</h2>
+            </div>
+            <button onclick="toggleLeftPanel()" class="text-slate-400 hover:text-slate-700 text-sm font-bold px-1.5">✕</button>
+        </div>
+
+        <div class="p-4 overflow-y-auto custom-scroll space-y-4 flex-1">
+            <!-- Botoeira Industrial Principal -->
+            <div class="bg-slate-100 border border-slate-200 rounded-xl p-3">
+                <span class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2.5">Quadro Elétrico — Acionamento</span>
+                <div class="grid grid-cols-3 gap-2">
+                    <button id="btn-start" onclick="startPump()" class="flex flex-col items-center justify-center p-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold shadow-md border-b-4 border-emerald-800 transition">
+                        <span class="w-3.5 h-3.5 rounded-full bg-emerald-200 mb-1 shadow-inner"></span>
+                        <span class="text-xs">LIGAR</span>
+                    </button>
+                    <button id="btn-stop" onclick="stopPump()" class="flex flex-col items-center justify-center p-2.5 rounded-xl bg-slate-600 hover:bg-slate-500 active:scale-95 text-white font-bold shadow-md border-b-4 border-slate-800 transition">
+                        <span class="w-3.5 h-3.5 rounded-full bg-slate-300 mb-1"></span>
+                        <span class="text-xs">PARAR</span>
+                    </button>
+                    <button id="btn-emergency" onclick="triggerEmergency()" class="flex flex-col items-center justify-center p-2.5 rounded-xl bg-red-600 hover:bg-red-500 active:scale-95 text-white font-bold shadow-md border-b-4 border-red-900 transition">
+                        <span class="w-4 h-4 rounded-full bg-yellow-300 border-2 border-red-900 mb-1 flex items-center justify-center text-[9px] text-red-900 font-black">!</span>
+                        <span class="text-[11px]">EMERGÊNCIA</span>
+                    </button>
+                </div>
+                <div id="emergency-banner" class="hidden mt-2.5 bg-red-100 border border-red-300 text-red-800 rounded-lg px-2.5 py-1.5 text-xs flex items-center justify-between">
+                    <span class="font-semibold">Parada de emergência acionada!</span>
+                    <button onclick="resetEmergency()" class="underline font-bold text-red-900 hover:text-red-700 ml-2">Rearmar</button>
+                </div>
+            </div>
+
+            <!-- Controle 1: Frequência do Inversor -->
+            <div class="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
+                <div class="flex justify-between items-center mb-1">
+                    <label for="slider-freq" class="text-xs font-bold text-slate-700">1. Inversor da Bomba (Pressão)</label>
+                    <span id="val-freq" class="mono text-xs font-bold text-cyan-700 bg-cyan-50 px-2 py-0.5 rounded-md border border-cyan-200">50 Hz</span>
+                </div>
+                <p class="text-[11px] text-slate-500 mb-2">Varia a altura manométrica (H) e a velocidade do jato (v₁).</p>
+                <input type="range" id="slider-freq" min="20" max="60" step="1" value="50" class="w-full" oninput="updateControls()">
+                <div class="flex justify-between text-[10px] text-slate-400 mono mt-1">
+                    <span>20 Hz</span>
+                    <span>40 Hz</span>
+                    <span>60 Hz</span>
+                </div>
+            </div>
+
+            <!-- Controle 2: Abertura da Agulha Spear -->
+            <div class="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
+                <div class="flex justify-between items-center mb-1">
+                    <label for="slider-needle" class="text-xs font-bold text-slate-700">2. Agulha do Injetor (Vazão)</label>
+                    <span id="val-needle" class="mono text-xs font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">75 %</span>
+                </div>
+                <p class="text-[11px] text-slate-500 mb-2">Posiciona a agulha cônica no bocal, controlando a vazão Q.</p>
+                <input type="range" id="slider-needle" min="0" max="100" step="1" value="75" class="w-full" oninput="updateControls()">
+                <div class="flex justify-between text-[10px] text-slate-400 mono mt-1">
+                    <span>0% (Fechado)</span>
+                    <span>50%</span>
+                    <span>100% (Pleno)</span>
+                </div>
+            </div>
+
+            <!-- Controle 3: Freio Dinamométrico -->
+            <div class="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
+                <div class="flex justify-between items-center mb-1">
+                    <label for="slider-brake" class="text-xs font-bold text-slate-700">3. Carga do Freio (Dinamômetro)</label>
+                    <span id="val-brake" class="mono text-xs font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">1.80 N·m</span>
+                </div>
+                <p class="text-[11px] text-slate-500 mb-2">Aplica torque resistente no disco para variar a rotação (RPM).</p>
+                <input type="range" id="slider-brake" min="0" max="6.0" step="0.05" value="1.80" class="w-full" oninput="updateControls()">
+                <div class="flex justify-between text-[10px] text-slate-400 mono mt-1">
+                    <span>0 N·m (Vazio)</span>
+                    <span>3.0 N·m</span>
+                    <span>6.0 N·m (Bloqueio)</span>
+                </div>
+            </div>
+
+            <!-- Ponto Ótimo Automático -->
+            <div class="space-y-2 pt-1">
+                <button onclick="setOptimalPoint()" class="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-teal-700 to-cyan-600 hover:from-teal-600 hover:to-cyan-500 text-white text-xs font-bold shadow-md flex items-center justify-center gap-2 transition active:scale-[0.99]">
+                    <span>⚡</span>
+                    <span>Ponto Ótimo Automático (u/v₁ ≈ 0,47)</span>
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Painel Direito: Totem IHM, Telemetria e Curva Característica -->
+    <aside id="right-panel" class="fixed top-20 right-3 bottom-14 w-88 sm:w-96 max-w-[calc(100vw-1.5rem)] z-20 bg-white/95 backdrop-blur-md border border-slate-200/90 shadow-2xl rounded-2xl flex flex-col transition-transform duration-300">
+        <div class="px-4 py-3 border-b border-slate-200/80 flex items-center justify-between bg-teal-900 text-white rounded-t-2xl">
+            <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                <h2 class="text-xs font-bold uppercase tracking-wider">Totem IHM • Unisalesiano de Araçatuba</h2>
+            </div>
+            <button onclick="toggleRightPanel()" class="text-teal-200 hover:text-white text-sm font-bold px-1.5">✕</button>
+        </div>
+
+        <div class="p-4 overflow-y-auto custom-scroll space-y-3.5 flex-1">
+            <!-- Telemetria Hidráulica e Mecânica -->
+            <div class="grid grid-cols-2 gap-2">
+                <div class="bg-slate-50 border border-slate-200/90 rounded-xl p-2.5">
+                    <span class="text-[10px] font-bold uppercase text-slate-400 block">Vazão Volumétrica (Q)</span>
+                    <div class="mono text-base font-bold text-slate-800 mt-0.5"><span id="tel-q-ls">0.00</span> <span class="text-xs font-normal text-slate-500">L/s</span></div>
+                    <div class="mono text-[11px] text-slate-500"><span id="tel-q-m3h">0.00</span> m³/h</div>
+                </div>
+
+                <div class="bg-slate-50 border border-slate-200/90 rounded-xl p-2.5">
+                    <span class="text-[10px] font-bold uppercase text-slate-400 block">Pressão / Queda (P / H)</span>
+                    <div class="mono text-base font-bold text-cyan-700 mt-0.5"><span id="tel-press">0.00</span> <span class="text-xs font-normal text-slate-500">bar</span></div>
+                    <div class="mono text-[11px] text-slate-500">H = <span id="tel-head">0.0</span> mca</div>
+                </div>
+
+                <div class="bg-slate-50 border border-slate-200/90 rounded-xl p-2.5">
+                    <span class="text-[10px] font-bold uppercase text-slate-400 block">Vel. Jato (v₁) / Pá (u)</span>
+                    <div class="mono text-sm font-bold text-slate-800 mt-0.5">v₁: <span id="tel-v1">0.0</span> m/s</div>
+                    <div class="mono text-xs font-semibold text-teal-700">u: <span id="tel-u">0.0</span> m/s</div>
+                </div>
+
+                <div class="bg-slate-50 border border-slate-200/90 rounded-xl p-2.5">
+                    <span class="text-[10px] font-bold uppercase text-slate-400 block">Rotação & Torque no Eixo</span>
+                    <div class="mono text-base font-bold text-slate-800 mt-0.5"><span id="tel-rpm">0</span> <span class="text-xs font-normal text-slate-500">RPM</span></div>
+                    <div class="mono text-[11px] text-rose-600 font-semibold">τ = <span id="tel-torque">0.00</span> N·m</div>
+                </div>
+            </div>
+
+            <!-- Balanço de Potências, Rendimento e Frequência de Passagem das Pás -->
+            <div class="bg-gradient-to-br from-slate-800 to-slate-900 text-white rounded-xl p-3 shadow-inner">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-slate-300">Balanço Energético da Turbina</span>
+                    <span class="mono text-xs px-2 py-0.5 rounded bg-white/10 text-cyan-300">u/v₁ = <span id="tel-ratio">0.00</span></span>
+                </div>
+                <div class="grid grid-cols-3 gap-2 text-center">
+                    <div class="bg-white/5 rounded-lg p-2">
+                        <span class="text-[10px] text-slate-400 block">Pot. Hidráulica</span>
+                        <span class="mono text-sm font-bold text-cyan-300"><span id="tel-ph">0</span> W</span>
+                    </div>
+                    <div class="bg-white/5 rounded-lg p-2">
+                        <span class="text-[10px] text-slate-400 block">Pot. Mecânica</span>
+                        <span class="mono text-sm font-bold text-emerald-400"><span id="tel-pm">0</span> W</span>
+                    </div>
+                    <div class="bg-white/10 border border-emerald-500/40 rounded-lg p-2">
+                        <span class="text-[10px] text-emerald-200 block">Rendimento (η)</span>
+                        <span class="mono text-base font-extrabold text-emerald-300"><span id="tel-eff">0.0</span>%</span>
+                    </div>
+                </div>
+                <div class="mt-2 pt-2 border-t border-white/10 flex items-center justify-between text-[11px]">
+                    <span class="text-slate-400 flex items-center gap-1.5">
+                        <span id="acoustic-led" class="w-2 h-2 rounded-full bg-slate-500"></span>
+                        <span>Assinatura Acústica (18 pás):</span>
+                    </span>
+                    <span class="mono font-bold text-amber-300"><span id="tel-bpf">0.0</span> Hz <span class="text-[10px] text-slate-400 font-normal">(BPF)</span></span>
+                </div>
+            </div>
+
+            <!-- Curva Característica Dinâmica (η e Pₘ vs. u/v₁) -->
+            <div class="bg-white border border-slate-200 rounded-xl p-3">
+                <div class="flex items-center justify-between mb-1.5">
+                    <span class="text-xs font-bold text-slate-700">Curva Característica (η e Pₘ vs. u/v₁)</span>
+                    <span class="text-[10px] text-slate-400">Ponto atual ●</span>
+                </div>
+                <div class="w-full h-44 relative bg-slate-50 rounded-lg border border-slate-200/80 overflow-hidden">
+                    <canvas id="curve-canvas" class="w-full h-full block"></canvas>
+                </div>
+                <div class="flex items-center justify-between text-[10px] text-slate-500 mt-1.5">
+                    <span class="flex items-center gap-1"><i class="w-2.5 h-1 bg-teal-600 inline-block rounded"></i> Rendimento η (%)</span>
+                    <span class="flex items-center gap-1"><i class="w-2.5 h-1 bg-amber-500 inline-block rounded"></i> Potência Pₘ (W)</span>
+                    <span class="text-slate-400">Ótimo: u/v₁ ≈ 0.47</span>
+                </div>
+            </div>
+
+            <!-- Nota Didática Contextual -->
+            <div id="didactic-note" class="bg-cyan-50 border border-cyan-200/90 rounded-xl p-2.5 text-xs text-cyan-950 leading-relaxed">
+                <strong>Dica Didática — Unisalesiano de Araçatuba:</strong> Ligue a bomba no painel esquerdo e ajuste a carga de frenagem para observar como o rendimento atinge o pico quando u/v₁ se aproxima de 0,47.
+            </div>
+        </div>
+    </aside>
+
+    <!-- Rodapé de Instruções de Câmera -->
+    <footer class="fixed bottom-2 left-3 right-3 z-10 pointer-events-none flex justify-center">
+        <div class="bg-slate-900/80 backdrop-blur-md text-slate-200 text-[11px] px-3.5 py-1 rounded-full border border-white/10 shadow-md">
+            🖱️ <strong>Arrastar:</strong> Girar câmera • <strong>Scroll:</strong> Zoom • <strong>Botão Direito / 2 Dedos:</strong> Mover vista
+        </div>
+    </footer>
+
+    <script>
+        // ============================================================================
+        // 1. PARÂMETROS FÍSICOS E ESTADO DA BANCADA PELTON (MF15)
+        // ============================================================================
+        const RHO = 998.2;               // Densidade da água (kg/m³)
+        const G = 9.81;                  // Gravidade (m/s²)
+        const D_ROTOR = 0.22;            // Diâmetro primitivo do rotor Pelton (m)
+        const R_ROTOR = D_ROTOR / 2;     // Raio primitivo (0.11 m)
+        const NUM_BUCKETS = 18;          // 18 conchas bipartidas
+        const D_NOZZLE_MAX = 0.014;      // Diâmetro máximo do bocal (14 mm)
+        const CV_NOZZLE = 0.97;          // Coeficiente de velocidade do bocal Spear
+        const BETA2_RAD = (165 * Math.PI) / 180; // Ângulo de deflexão da concha (~165°)
+        const K_BLADE = 0.88;            // Coeficiente relativo de atrito na concha
+        const J_ROTOR = 0.018;           // Momento de inércia rotacional (kg·m²)
+
+        const simState = {
+            pumpOn: false,
+            emergency: false,
+            pumpRamp: 0,
+            frequencyHz: 50,
+            needleOpening: 0.75,
+            brakeTorque: 1.80,
+            headM: 0,
+            pressureBar: 0,
+            flowRateM3s: 0,
+            v1: 0,
+            omega: 0,
+            rpm: 0,
+            u: 0,
+            w1: 0,
+            hydraulicPower: 0,
+            mechanicalPower: 0,
+            shaftTorque: 0,
+            efficiency: 0,
+            ratioUV: 0,
+            bpfHz: 0
+        };
+
+        // ============================================================================
+        // 2. MOTOR DE SÍNTESE SONORA EM TEMPO REAL (WEB AUDIO API)
+        // ============================================================================
+        const soundEngine = {
+            ctx: null,
+            initialized: false,
+            muted: false,
+            masterVolume: 0.65,
+            masterGain: null,
+            turbineFundOsc: null,
+            turbineHarmOsc: null,
+            turbineSubOsc: null,
+            turbineFilter: null,
+            turbineGain: null,
+            jetNoiseSource: null,
+            jetBandpass: null,
+            jetHighshelf: null,
+            jetGain: null,
+            pumpOsc: null,
+            pumpFilter: null,
+            pumpGain: null,
+            brakeNoiseSource: null,
+            brakeFilter: null,
+            brakeGain: null
+        };
+
+        function createPinkNoiseBuffer(audioCtx, durationSec = 3.0) {
+            const bufferSize = Math.floor(audioCtx.sampleRate * durationSec);
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+            for (let i = 0; i < bufferSize; i++) {
+                const white = Math.random() * 2 - 1;
+                b0 = 0.99886 * b0 + white * 0.0555179;
+                b1 = 0.99332 * b1 + white * 0.0750759;
+                b2 = 0.96900 * b2 + white * 0.1538520;
+                b3 = 0.86650 * b3 + white * 0.3104856;
+                b4 = 0.55000 * b4 + white * 0.5329522;
+                b5 = -0.7616 * b5 - white * 0.0168980;
+                data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.045;
+                b6 = white * 0.115926;
+            }
+            return buffer;
+        }
+
+        function initSoundEngine() {
+            if (soundEngine.initialized) {
+                if (soundEngine.ctx && soundEngine.ctx.state === 'suspended') {
+                    soundEngine.ctx.resume().catch(() => {});
+                }
+                return;
+            }
+            try {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (!AudioCtx) return;
+
+                const ctx = new AudioCtx();
+                soundEngine.ctx = ctx;
+
+                const compressor = ctx.createDynamicsCompressor();
+                compressor.threshold.value = -14;
+                compressor.knee.value = 18;
+                compressor.ratio.value = 4;
+                compressor.attack.value = 0.01;
+                compressor.release.value = 0.15;
+
+                const masterGain = ctx.createGain();
+                masterGain.gain.value = soundEngine.muted ? 0 : soundEngine.masterVolume;
+                compressor.connect(masterGain);
+                masterGain.connect(ctx.destination);
+                soundEngine.masterGain = masterGain;
+
+                const noiseBuffer = createPinkNoiseBuffer(ctx, 3.0);
+
+                // Rotor Pelton (BPF = (RPM/60) * 18)
+                const turbineFilter = ctx.createBiquadFilter();
+                turbineFilter.type = 'lowpass';
+                turbineFilter.frequency.value = 600;
+                turbineFilter.Q.value = 2.8;
+
+                const turbineGain = ctx.createGain();
+                turbineGain.gain.value = 0;
+
+                const turbineFundOsc = ctx.createOscillator();
+                turbineFundOsc.type = 'triangle';
+                turbineFundOsc.frequency.value = 60;
+
+                const turbineHarmOsc = ctx.createOscillator();
+                turbineHarmOsc.type = 'sine';
+                turbineHarmOsc.frequency.value = 120;
+                const harmGain = ctx.createGain();
+                harmGain.gain.value = 0.42;
+
+                const turbineSubOsc = ctx.createOscillator();
+                turbineSubOsc.type = 'sine';
+                turbineSubOsc.frequency.value = 10;
+                const subGain = ctx.createGain();
+                subGain.gain.value = 0.55;
+
+                turbineFundOsc.connect(turbineFilter);
+                turbineHarmOsc.connect(harmGain);
+                harmGain.connect(turbineFilter);
+                turbineSubOsc.connect(subGain);
+                subGain.connect(turbineFilter);
+                turbineFilter.connect(turbineGain);
+                turbineGain.connect(compressor);
+
+                turbineFundOsc.start();
+                turbineHarmOsc.start();
+                turbineSubOsc.start();
+
+                soundEngine.turbineFundOsc = turbineFundOsc;
+                soundEngine.turbineHarmOsc = turbineHarmOsc;
+                soundEngine.turbineSubOsc = turbineSubOsc;
+                soundEngine.turbineFilter = turbineFilter;
+                soundEngine.turbineGain = turbineGain;
+
+                // Jato hidráulico pressurizado
+                const jetNoiseSource = ctx.createBufferSource();
+                jetNoiseSource.buffer = noiseBuffer;
+                jetNoiseSource.loop = true;
+
+                const jetBandpass = ctx.createBiquadFilter();
+                jetBandpass.type = 'bandpass';
+                jetBandpass.frequency.value = 950;
+                jetBandpass.Q.value = 0.85;
+
+                const jetHighshelf = ctx.createBiquadFilter();
+                jetHighshelf.type = 'highshelf';
+                jetHighshelf.frequency.value = 2400;
+                jetHighshelf.gain.value = 4.0;
+
+                const jetGain = ctx.createGain();
+                jetGain.gain.value = 0;
+
+                jetNoiseSource.connect(jetBandpass);
+                jetBandpass.connect(jetHighshelf);
+                jetHighshelf.connect(jetGain);
+                jetGain.connect(compressor);
+                jetNoiseSource.start();
+
+                soundEngine.jetNoiseSource = jetNoiseSource;
+                soundEngine.jetBandpass = jetBandpass;
+                soundEngine.jetHighshelf = jetHighshelf;
+                soundEngine.jetGain = jetGain;
+
+                // Bomba centrífuga / inversor
+                const pumpOsc = ctx.createOscillator();
+                pumpOsc.type = 'sawtooth';
+                pumpOsc.frequency.value = 100;
+
+                const pumpFilter = ctx.createBiquadFilter();
+                pumpFilter.type = 'lowpass';
+                pumpFilter.frequency.value = 220;
+
+                const pumpGain = ctx.createGain();
+                pumpGain.gain.value = 0;
+
+                pumpOsc.connect(pumpFilter);
+                pumpFilter.connect(pumpGain);
+                pumpGain.connect(compressor);
+                pumpOsc.start();
+
+                soundEngine.pumpOsc = pumpOsc;
+                soundEngine.pumpFilter = pumpFilter;
+                soundEngine.pumpGain = pumpGain;
+
+                // Atrito do freio dinamométrico
+                const brakeNoiseSource = ctx.createBufferSource();
+                brakeNoiseSource.buffer = noiseBuffer;
+                brakeNoiseSource.loop = true;
+
+                const brakeFilter = ctx.createBiquadFilter();
+                brakeFilter.type = 'bandpass';
+                brakeFilter.frequency.value = 1800;
+                brakeFilter.Q.value = 4.5;
+
+                const brakeGain = ctx.createGain();
+                brakeGain.gain.value = 0;
+
+                brakeNoiseSource.connect(brakeFilter);
+                brakeFilter.connect(brakeGain);
+                brakeGain.connect(compressor);
+                brakeNoiseSource.start();
+
+                soundEngine.brakeNoiseSource = brakeNoiseSource;
+                soundEngine.brakeFilter = brakeFilter;
+                soundEngine.brakeGain = brakeGain;
+
+                soundEngine.initialized = true;
+            } catch (err) {
+                console.warn('Áudio indisponível:', err);
+            }
+        }
+
+        function updateSoundEngine() {
+            const fRot = simState.rpm / 60.0;
+            const bpf = fRot * NUM_BUCKETS;
+            simState.bpfHz = bpf;
+
+            if (!soundEngine.initialized || !soundEngine.ctx) return;
+            const now = soundEngine.ctx.currentTime;
+            const tc = 0.06;
+
+            const rpmNorm = Math.min(1.5, simState.rpm / 1200);
+            const fundFreq = Math.max(24, Math.min(1600, bpf));
+            soundEngine.turbineFundOsc.frequency.setTargetAtTime(fundFreq, now, tc);
+            soundEngine.turbineHarmOsc.frequency.setTargetAtTime(fundFreq * 2.0, now, tc);
+            soundEngine.turbineSubOsc.frequency.setTargetAtTime(Math.max(12, fRot), now, tc);
+            soundEngine.turbineFilter.frequency.setTargetAtTime(180 + fundFreq * 2.6, now, tc);
+
+            const turbineVol = simState.rpm > 8
+                ? Math.min(0.42, 0.04 + Math.pow(rpmNorm, 1.15) * 0.28)
+                : 0.0;
+            soundEngine.turbineGain.gain.setTargetAtTime(turbineVol, now, tc);
+
+            const jetIntensity = simState.v1 > 0.5
+                ? Math.min(1.2, (simState.v1 / 25) * (0.35 + 0.65 * simState.needleOpening))
+                : 0;
+            const jetCenterFreq = 450 + simState.v1 * 68 + (1 - simState.needleOpening) * 420;
+            soundEngine.jetBandpass.frequency.setTargetAtTime(Math.min(3500, jetCenterFreq), now, tc);
+            soundEngine.jetGain.gain.setTargetAtTime(jetIntensity * 0.52, now, tc);
+
+            const pumpFreq = simState.frequencyHz * 2.0;
+            soundEngine.pumpOsc.frequency.setTargetAtTime(pumpFreq, now, tc);
+            soundEngine.pumpFilter.frequency.setTargetAtTime(140 + simState.frequencyHz * 3.0, now, tc);
+            soundEngine.pumpGain.gain.setTargetAtTime(simState.pumpRamp * 0.09, now, tc);
+
+            const brakeIntensity = (simState.rpm > 15 && simState.brakeTorque > 0.05)
+                ? Math.min(1.0, (simState.brakeTorque / 6.0) * (simState.rpm / 900))
+                : 0;
+            soundEngine.brakeFilter.frequency.setTargetAtTime(1200 + simState.rpm * 0.85, now, tc);
+            soundEngine.brakeGain.gain.setTargetAtTime(brakeIntensity * 0.09, now, tc);
+        }
+
+        function playUiClickSound(pitch = 520) {
+            initSoundEngine();
+            if (!soundEngine.initialized || soundEngine.muted || !soundEngine.ctx) return;
+            const ctx = soundEngine.ctx;
+            const now = ctx.currentTime;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(pitch, now);
+            osc.frequency.exponentialRampToValueAtTime(pitch * 0.45, now + 0.055);
+            gain.gain.setValueAtTime(0.14, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+            osc.connect(gain);
+            gain.connect(soundEngine.masterGain);
+            osc.start(now);
+            osc.stop(now + 0.065);
+        }
+
+        function playEmergencyAlarmSound() {
+            initSoundEngine();
+            if (!soundEngine.initialized || soundEngine.muted || !soundEngine.ctx) return;
+            const ctx = soundEngine.ctx;
+            const now = ctx.currentTime;
+            for (let i = 0; i < 2; i++) {
+                const t0 = now + i * 0.16;
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(680, t0);
+                osc.frequency.linearRampToValueAtTime(420, t0 + 0.13);
+                gain.gain.setValueAtTime(0.18, t0);
+                gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.14);
+                osc.connect(gain);
+                gain.connect(soundEngine.masterGain);
+                osc.start(t0);
+                osc.stop(t0 + 0.145);
+            }
+        }
+
+        function toggleAudioMute() {
+            initSoundEngine();
+            soundEngine.muted = !soundEngine.muted;
+            if (soundEngine.masterGain && soundEngine.ctx) {
+                soundEngine.masterGain.gain.setTargetAtTime(
+                    soundEngine.muted ? 0 : soundEngine.masterVolume,
+                    soundEngine.ctx.currentTime,
+                    0.03
+                );
+            }
+            updateAudioUI();
+            if (!soundEngine.muted) playUiClickSound(640);
+        }
+
+        function updateAudioVolume() {
+            initSoundEngine();
+            const slider = document.getElementById('slider-volume');
+            const val = slider ? parseFloat(slider.value) : 65;
+            soundEngine.masterVolume = val / 100.0;
+            if (val > 0 && soundEngine.muted) {
+                soundEngine.muted = false;
+            }
+            if (soundEngine.masterGain && soundEngine.ctx) {
+                soundEngine.masterGain.gain.setTargetAtTime(
+                    soundEngine.muted ? 0 : soundEngine.masterVolume,
+                    soundEngine.ctx.currentTime,
+                    0.03
+                );
+            }
+            updateAudioUI();
+        }
+
+        function updateAudioUI() {
+            const iconEl = document.getElementById('audio-icon');
+            const labelEl = document.getElementById('audio-label');
+            const ledEl = document.getElementById('acoustic-led');
+            const isActive = !soundEngine.muted && soundEngine.masterVolume > 0;
+
+            if (iconEl) iconEl.textContent = isActive ? '🔊' : '🔇';
+            if (labelEl) labelEl.textContent = isActive ? 'Som ON' : 'Mudo';
+            if (ledEl) {
+                ledEl.className = (isActive && soundEngine.initialized)
+                    ? 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse'
+                    : 'w-2 h-2 rounded-full bg-slate-500';
+            }
+        }
+
+        // ============================================================================
+        // 3. CENA 3D (THREE.JS / WEBGL) + FALLBACK 2D EM CANVAS
+        // ============================================================================
+        let scene = null;
+        let camera = null;
+        let renderer = null;
+        let clock = null;
+        let rotorGroup = null;
+        let needleMesh = null;
+        let valveWheelMesh = null;
+        let manometerNeedle = null;
+        let jetMesh = null;
+        let splashParticles = null;
+        let waterTankMesh = null;
+        let ledGreen = null;
+        let ledRed = null;
+        let useCanvas2DFallback = false;
+        let fallbackCanvas = null;
+        let fallbackCtx = null;
+        let resizeObserverInstance = null;
+
+        const camControl = {
+            theta: 0.38,
+            phi: 1.24,
+            radius: 3.35,
+            desiredTheta: 0.38,
+            desiredPhi: 1.24,
+            desiredRadius: 3.35,
+            target: { x: 0.15, y: 0.92, z: 0 },
+            desiredTarget: { x: 0.15, y: 0.92, z: 0 },
+            isDragging: false,
+            isPanning: false,
+            lastX: 0,
+            lastY: 0
+        };
+
+        const CAMERA_PRESETS = {
+            overview: { theta: 0.38, phi: 1.24, radius: 3.35, tx: 0.15, ty: 0.92, tz: 0 },
+            rotor:    { theta: 0.32, phi: 1.32, radius: 1.15, tx: 0.42, ty: 1.32, tz: 0.05 },
+            injector: { theta: 0.22, phi: 1.34, radius: 1.25, tx: -0.25, ty: 1.26, tz: 0.05 },
+            top:      { theta: 0.55, phi: 1.15, radius: 3.45, tx: 0.65, ty: 0.88, tz: 0 }
+        };
+
+        function setCameraPreset(presetName) {
+            const p = CAMERA_PRESETS[presetName];
+            if (!p) return;
+            camControl.desiredTheta = p.theta;
+            camControl.desiredPhi = p.phi;
+            camControl.desiredRadius = p.radius;
+            camControl.desiredTarget.x = p.tx;
+            camControl.desiredTarget.y = p.ty;
+            camControl.desiredTarget.z = p.tz;
+
+            document.querySelectorAll('.cam-btn').forEach(btn => {
+                btn.className = 'cam-btn px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition';
+            });
+            const activeBtn = document.getElementById(`cam-${presetName}`);
+            if (activeBtn) {
+                activeBtn.className = 'cam-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-teal-700 text-white shadow-sm transition';
+            }
+        }
+
+        function setupFallback2D(container) {
+            useCanvas2DFallback = true;
+            if (!fallbackCanvas) {
+                fallbackCanvas = document.createElement('canvas');
+                fallbackCanvas.className = 'w-full h-full block';
+                container.innerHTML = '';
+                container.appendChild(fallbackCanvas);
+                fallbackCtx = fallbackCanvas.getContext('2d');
+            }
+            resizeCanvasSurface();
+        }
+
+        function resizeCanvasSurface() {
+            const container = document.getElementById('canvas-container');
+            if (!container) return;
+            const width = Math.max(1, container.clientWidth);
+            const height = Math.max(1, container.clientHeight);
+            const dpr = Math.min(2, window.devicePixelRatio || 1);
+
+            if (useCanvas2DFallback && fallbackCanvas) {
+                fallbackCanvas.width = Math.round(width * dpr);
+                fallbackCanvas.height = Math.round(height * dpr);
+                if (fallbackCtx) {
+                    fallbackCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                }
+            } else if (renderer && camera) {
+                camera.aspect = width / height;
+                camera.updateProjectionMatrix();
+                renderer.setPixelRatio(dpr);
+                renderer.setSize(width, height);
+            }
+        }
+
+        function createBenchLabelTexture(text, subtext, bgHex, fgHex) {
+            const c = document.createElement('canvas');
+            c.width = 1024;
+            c.height = 160;
+            const ctx = c.getContext('2d');
+            ctx.fillStyle = bgHex;
+            ctx.fillRect(0, 0, c.width, c.height);
+            ctx.fillStyle = fgHex;
+            ctx.font = '800 42px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, c.width / 2, subtext ? 58 : c.height / 2);
+            if (subtext) {
+                ctx.font = '700 26px Inter, sans-serif';
+                ctx.fillStyle = '#bae6fd';
+                ctx.fillText(subtext, c.width / 2, 112);
+            }
+            const tex = new THREE.CanvasTexture(c);
+            tex.needsUpdate = true;
+            return tex;
+        }
+
+        function createPeltonBucketGeometry() {
+            const group = new THREE.Group();
+            const bucketMat = new THREE.MeshStandardMaterial({
+                color: 0xcbd5e1,
+                metalness: 0.78,
+                roughness: 0.25,
+                side: THREE.DoubleSide
+            });
+
+            [-0.011, 0.011].forEach((zOff) => {
+                const cupGeo = new THREE.SphereGeometry(0.022, 16, 12, 0, Math.PI, 0, Math.PI * 0.75);
+                cupGeo.scale(0.85, 1.05, 0.52);
+                const cup = new THREE.Mesh(cupGeo, bucketMat);
+                cup.position.set(0, 0.016, zOff);
+                cup.rotation.z = Math.PI * 0.65;
+                cup.castShadow = true;
+                group.add(cup);
+            });
+
+            const splitter = new THREE.Mesh(
+                new THREE.BoxGeometry(0.026, 0.032, 0.005),
+                new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.85, roughness: 0.2 })
+            );
+            splitter.position.set(0.004, 0.016, 0);
+            splitter.rotation.z = 0.4;
+            group.add(splitter);
+
+            return group;
+        }
+
+        function buildPeltonBench3D() {
+            const benchGroup = new THREE.Group();
+
+            const tealDarkMat = new THREE.MeshStandardMaterial({ color: 0x0f766e, metalness: 0.25, roughness: 0.45 });
+            const cyanPanelMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.2, roughness: 0.4 });
+            const cyanBrightMat = new THREE.MeshStandardMaterial({ color: 0x06b6d4, metalness: 0.2, roughness: 0.35 });
+            const topDeckMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.65, roughness: 0.3 });
+            const pvcPipeMat = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, metalness: 0.08, roughness: 0.4 });
+            const yellowValveMat = new THREE.MeshStandardMaterial({ color: 0xeab308, metalness: 0.2, roughness: 0.35 });
+            const greenPumpMat = new THREE.MeshStandardMaterial({ color: 0x16a34a, metalness: 0.25, roughness: 0.38 });
+            const darkSteelMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.75, roughness: 0.32 });
+            const chromeMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, metalness: 0.9, roughness: 0.15 });
+            const acrylicMat = new THREE.MeshPhysicalMaterial({
+                color: 0xdbeafe,
+                transparent: true,
+                opacity: 0.28,
+                roughness: 0.08,
+                metalness: 0.0,
+                depthWrite: false
+            });
+
+            const wBench = 2.55, hBench = 0.86, dBench = 0.70;
+            const yBase = 0.12;
+
+            // Tampo superior
+            const topDeck = new THREE.Mesh(new THREE.BoxGeometry(wBench + 0.04, 0.04, dBench + 0.04), topDeckMat);
+            topDeck.position.set(0, yBase + hBench, 0);
+            topDeck.castShadow = true;
+            topDeck.receiveShadow = true;
+            benchGroup.add(topDeck);
+
+            // Base e colunas estruturais
+            const bottomPlate = new THREE.Mesh(new THREE.BoxGeometry(wBench, 0.04, dBench), tealDarkMat);
+            bottomPlate.position.set(0, yBase + 0.02, 0);
+            bottomPlate.receiveShadow = true;
+            benchGroup.add(bottomPlate);
+
+            const leftColumn = new THREE.Mesh(new THREE.BoxGeometry(0.26, hBench, dBench), cyanPanelMat);
+            leftColumn.position.set(-wBench / 2 + 0.13, yBase + hBench / 2, 0);
+            leftColumn.castShadow = true;
+            benchGroup.add(leftColumn);
+
+            const leftAccent = new THREE.Mesh(new THREE.BoxGeometry(0.14, hBench - 0.02, 0.02), cyanBrightMat);
+            leftAccent.position.set(-wBench / 2 + 0.26, yBase + hBench / 2, dBench / 2 + 0.005);
+            benchGroup.add(leftAccent);
+
+            const rightColumn = new THREE.Mesh(new THREE.BoxGeometry(0.14, hBench, dBench), tealDarkMat);
+            rightColumn.position.set(wBench / 2 - 0.07, yBase + hBench / 2, 0);
+            rightColumn.castShadow = true;
+            benchGroup.add(rightColumn);
+
+            const backWall = new THREE.Mesh(new THREE.BoxGeometry(wBench - 0.36, hBench - 0.04, 0.03), tealDarkMat);
+            backWall.position.set(0.05, yBase + hBench / 2, -dBench / 2 + 0.02);
+            backWall.receiveShadow = true;
+            benchGroup.add(backWall);
+
+            // Placa frontal com "Unisalesiano de Araçatuba"
+            const titleTex = createBenchLabelTexture(
+                'MF15 - ESTUDO DE TURBINA PELTON',
+                'UNISALESIANO DE ARAÇATUBA',
+                '#0f766e',
+                '#ffffff'
+            );
+            const titlePlane = new THREE.Mesh(
+                new THREE.PlaneGeometry(1.75, 0.15),
+                new THREE.MeshBasicMaterial({ map: titleTex })
+            );
+            titlePlane.position.set(0.28, yBase + hBench - 0.085, dBench / 2 + 0.025);
+            benchGroup.add(titlePlane);
+
+            // Rodízios
+            [[-1.12, -0.28], [1.12, -0.28], [-1.12, 0.28], [1.12, 0.28]].forEach(([wx, wz]) => {
+                const wheelGroup = new THREE.Group();
+                const bracket = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.05, 0.07), darkSteelMat);
+                bracket.position.y = 0.095;
+                const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.035, 18), darkSteelMat);
+                wheel.rotation.x = Math.PI / 2;
+                wheel.position.y = 0.055;
+                wheelGroup.add(bracket, wheel);
+                wheelGroup.position.set(wx, 0, wz);
+                benchGroup.add(wheelGroup);
+            });
+
+            // Reservatório inferior com nível de água dinâmico
+            const tankGroup = new THREE.Group();
+            const tankShell = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.56, 0.52), acrylicMat);
+            tankShell.position.set(0.45, yBase + 0.32, -0.02);
+            tankGroup.add(tankShell);
+
+            waterTankMesh = new THREE.Mesh(
+                new THREE.BoxGeometry(0.91, 0.42, 0.48),
+                new THREE.MeshPhysicalMaterial({ color: 0x0ea5e9, transparent: true, opacity: 0.65, roughness: 0.12 })
+            );
+            waterTankMesh.position.set(0.45, 0.42, -0.02);
+            tankGroup.add(waterTankMesh);
+            benchGroup.add(tankGroup);
+
+            // Bomba centrífuga verde + motor elétrico
+            const pumpGroup = new THREE.Group();
+            const volute = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.11, 24), greenPumpMat);
+            volute.rotation.x = Math.PI / 2;
+            volute.position.set(-0.55, yBase + 0.18, 0.08);
+            const motorBody = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.28, 20), darkSteelMat);
+            motorBody.rotation.z = Math.PI / 2;
+            motorBody.position.set(-0.78, yBase + 0.18, 0.08);
+            pumpGroup.add(volute, motorBody);
+            benchGroup.add(pumpGroup);
+
+            // Quadro elétrico frontal
+            const panelBox = new THREE.Mesh(
+                new THREE.BoxGeometry(0.28, 0.44, 0.06),
+                new THREE.MeshStandardMaterial({ color: 0xe7e5e4, roughness: 0.5 })
+            );
+            panelBox.position.set(-0.82, yBase + 0.44, dBench / 2 - 0.02);
+            panelBox.castShadow = true;
+            benchGroup.add(panelBox);
+
+            ledGreen = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.018, 0.018, 0.025, 16),
+                new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x000000, roughness: 0.3 })
+            );
+            ledGreen.rotation.x = Math.PI / 2;
+            ledGreen.position.set(-0.88, yBase + 0.58, dBench / 2 + 0.015);
+
+            ledRed = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.018, 0.018, 0.025, 16),
+                new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0x000000, roughness: 0.3 })
+            );
+            ledRed.rotation.x = Math.PI / 2;
+            ledRed.position.set(-0.82, yBase + 0.58, dBench / 2 + 0.015);
+
+            const eStopCap = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.026, 0.026, 0.03, 18),
+                new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.3 })
+            );
+            eStopCap.rotation.x = Math.PI / 2;
+            eStopCap.position.set(-0.82, yBase + 0.44, dBench / 2 + 0.02);
+            benchGroup.add(ledGreen, ledRed, eStopCap);
+
+            // Tubulação superior, válvula globo amarela, válvula de esfera azul, manômetro e bocal Spear
+            const yPipe = yBase + hBench + 0.14;
+            const zPipe = 0.04;
+
+            const mainPipe = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.036, 1.18, 20), pvcPipeMat);
+            mainPipe.rotation.z = Math.PI / 2;
+            mainPipe.position.set(-0.48, yPipe, zPipe);
+            mainPipe.castShadow = true;
+            benchGroup.add(mainPipe);
+
+            const globeBody = new THREE.Mesh(new THREE.SphereGeometry(0.062, 18, 16), yellowValveMat);
+            globeBody.position.set(-0.86, yPipe, zPipe);
+            const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.14, 12), chromeMat);
+            stem.position.set(-0.86, yPipe + 0.07, zPipe);
+
+            valveWheelMesh = new THREE.Group();
+            const rim = new THREE.Mesh(new THREE.TorusGeometry(0.055, 0.008, 12, 24), cyanPanelMat);
+            rim.rotation.x = Math.PI / 2;
+            const spoke1 = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, 0.11, 8), chromeMat);
+            spoke1.rotation.z = Math.PI / 2;
+            const spoke2 = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, 0.11, 8), chromeMat);
+            spoke2.rotation.x = Math.PI / 2;
+            valveWheelMesh.add(rim, spoke1, spoke2);
+            valveWheelMesh.position.set(-0.86, yPipe + 0.14, zPipe);
+            benchGroup.add(globeBody, stem, valveWheelMesh);
+
+            const gaugeGroup = new THREE.Group();
+            const gaugeCase = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.03, 24), darkSteelMat);
+            gaugeCase.rotation.x = Math.PI / 2;
+            const gaugeFace = new THREE.Mesh(new THREE.CircleGeometry(0.048, 24), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+            gaugeFace.position.z = 0.016;
+            manometerNeedle = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.036, 0.003), new THREE.MeshBasicMaterial({ color: 0xdc2626 }));
+            manometerNeedle.position.set(0, 0.012, 0.019);
+            gaugeGroup.add(gaugeCase, gaugeFace, manometerNeedle);
+            gaugeGroup.position.set(-0.34, yPipe + 0.11, zPipe);
+            benchGroup.add(gaugeGroup);
+
+            const nozzleBody = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.042, 0.16, 20), chromeMat);
+            nozzleBody.rotation.z = -Math.PI / 2;
+            nozzleBody.position.set(0.15, yPipe, zPipe);
+            benchGroup.add(nozzleBody);
+
+            const needleGeo = new THREE.ConeGeometry(0.011, 0.075, 16);
+            needleGeo.rotateZ(-Math.PI / 2);
+            needleMesh = new THREE.Mesh(needleGeo, new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.8, roughness: 0.25 }));
+            needleMesh.position.set(0.22, yPipe, zPipe);
+            benchGroup.add(needleMesh);
+
+            // Turbina Pelton com cúpula transparente, rotor de 18 pás e freio a disco
+            const turbineHousingGroup = new THREE.Group();
+            turbineHousingGroup.position.set(0.42, yPipe, zPipe);
+
+            const basePedestal = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.16, 0.36), tealDarkMat);
+            basePedestal.position.set(0, -0.22, 0);
+            basePedestal.castShadow = true;
+            basePedestal.receiveShadow = true;
+            turbineHousingGroup.add(basePedestal);
+
+            const domeGeo = new THREE.CylinderGeometry(0.21, 0.21, 0.34, 28, 1, false, 0, Math.PI);
+            domeGeo.rotateX(Math.PI / 2);
+            const domeMesh = new THREE.Mesh(domeGeo, acrylicMat);
+            domeMesh.position.set(0, 0, 0.15);
+            turbineHousingGroup.add(domeMesh);
+
+            const backCover = new THREE.Mesh(new THREE.CylinderGeometry(0.21, 0.21, 0.02, 28), tealDarkMat);
+            backCover.rotation.x = Math.PI / 2;
+            backCover.position.set(0, 0, -0.15);
+            turbineHousingGroup.add(backCover);
+
+            rotorGroup = new THREE.Group();
+            const hubDisc = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.024, 28), darkSteelMat);
+            hubDisc.rotation.x = Math.PI / 2;
+            rotorGroup.add(hubDisc);
+
+            for (let i = 0; i < NUM_BUCKETS; i++) {
+                const ang = (i / NUM_BUCKETS) * Math.PI * 2;
+                const bucketHolder = new THREE.Group();
+                bucketHolder.rotation.z = ang;
+                const bucket = createPeltonBucketGeometry();
+                bucket.position.set(0, 0.105, 0);
+                bucketHolder.add(bucket);
+                rotorGroup.add(bucketHolder);
+            }
+            turbineHousingGroup.add(rotorGroup);
+
+            const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.36, 16), chromeMat);
+            shaft.rotation.z = Math.PI / 2;
+            shaft.position.set(0.24, 0, 0);
+            const brakeDisc = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.095, 0.012, 24), darkSteelMat);
+            brakeDisc.rotation.z = Math.PI / 2;
+            brakeDisc.position.set(0.34, 0, 0);
+            const caliper = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.055, 0.045), new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.4 }));
+            caliper.position.set(0.34, 0.085, 0);
+            turbineHousingGroup.add(shaft, brakeDisc, caliper);
+
+            const jetGeo = new THREE.CylinderGeometry(0.0085, 0.0105, 0.25, 16);
+            jetGeo.rotateZ(-Math.PI / 2);
+            jetMesh = new THREE.Mesh(
+                jetGeo,
+                new THREE.MeshPhysicalMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.78, roughness: 0.08 })
+            );
+            jetMesh.position.set(-0.04, 0, 0);
+            jetMesh.visible = false;
+            turbineHousingGroup.add(jetMesh);
+
+            const pCount = 90;
+            const pPositions = new Float32Array(pCount * 3);
+            const pVels = [];
+            for (let i = 0; i < pCount; i++) {
+                pPositions[i * 3] = 0.09;
+                pPositions[i * 3 + 1] = 0;
+                pPositions[i * 3 + 2] = 0;
+                pVels.push({
+                    vx: (Math.random() - 0.3) * 0.55,
+                    vy: (Math.random() - 0.2) * 0.65,
+                    vz: (Math.random() - 0.5) * 0.65,
+                    life: Math.random()
+                });
+            }
+            const pGeo = new THREE.BufferGeometry();
+            pGeo.setAttribute('position', new THREE.BufferAttribute(pPositions, 3));
+            splashParticles = new THREE.Points(
+                pGeo,
+                new THREE.PointsMaterial({ color: 0x7dd3fc, size: 0.014, transparent: true, opacity: 0.85 })
+            );
+            splashParticles.userData = { velocities: pVels, originX: 0.09, originY: 0, originZ: 0 };
+            splashParticles.visible = false;
+            turbineHousingGroup.add(splashParticles);
+
+            benchGroup.add(turbineHousingGroup);
+
+            // Totem IHM lateral
+            const totemPost = new THREE.Mesh(new THREE.BoxGeometry(0.42, 1.52, 0.14), cyanPanelMat);
+            totemPost.position.set(1.62, 0.76, -0.05);
+            totemPost.castShadow = true;
+            const totemScreenTex = createBenchLabelTexture('IHM • MF15', 'UNISALESIANO DE ARAÇATUBA', '#0f172a', '#38bdf8');
+            const totemScreen = new THREE.Mesh(
+                new THREE.PlaneGeometry(0.34, 0.22),
+                new THREE.MeshBasicMaterial({ map: totemScreenTex })
+            );
+            totemScreen.position.set(1.62, 1.26, 0.022);
+            benchGroup.add(totemPost, totemScreen);
+
+            scene.add(benchGroup);
+        }
+
+        function bindCameraEvents(container) {
+            container.addEventListener('mousedown', (e) => {
+                initSoundEngine();
+                camControl.isDragging = true;
+                camControl.isPanning = (e.button === 2 || e.shiftKey);
+                camControl.lastX = e.clientX;
+                camControl.lastY = e.clientY;
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!camControl.isDragging) return;
+                const dx = e.clientX - camControl.lastX;
+                const dy = e.clientY - camControl.lastY;
+                camControl.lastX = e.clientX;
+                camControl.lastY = e.clientY;
+
+                if (camControl.isPanning) {
+                    camControl.desiredTarget.x -= dx * 0.003;
+                    camControl.desiredTarget.y += dy * 0.003;
+                } else {
+                    camControl.desiredTheta -= dx * 0.008;
+                    camControl.desiredPhi = Math.max(0.25, Math.min(1.48, camControl.desiredPhi - dy * 0.008));
+                }
+            });
+
+            window.addEventListener('mouseup', () => {
+                camControl.isDragging = false;
+                camControl.isPanning = false;
+            });
+
+            container.addEventListener('contextmenu', (e) => e.preventDefault());
+
+            container.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                camControl.desiredRadius = Math.max(0.65, Math.min(6.2, camControl.desiredRadius + e.deltaY * 0.0015));
+            }, { passive: false });
+
+            container.addEventListener('touchstart', (e) => {
+                initSoundEngine();
+                if (e.touches.length === 1) {
+                    camControl.isDragging = true;
+                    camControl.isPanning = false;
+                    camControl.lastX = e.touches[0].clientX;
+                    camControl.lastY = e.touches[0].clientY;
+                } else if (e.touches.length === 2) {
+                    camControl.isDragging = true;
+                    camControl.isPanning = true;
+                    camControl.lastX = (e.touches[0].clientX + e.touches[1].clientX) * 0.5;
+                    camControl.lastY = (e.touches[0].clientY + e.touches[1].clientY) * 0.5;
+                }
+            }, { passive: true });
+
+            container.addEventListener('touchmove', (e) => {
+                if (!camControl.isDragging || e.touches.length === 0) return;
+                const cx = e.touches.length === 2 ? (e.touches[0].clientX + e.touches[1].clientX) * 0.5 : e.touches[0].clientX;
+                const cy = e.touches.length === 2 ? (e.touches[0].clientY + e.touches[1].clientY) * 0.5 : e.touches[0].clientY;
+                const dx = cx - camControl.lastX;
+                const dy = cy - camControl.lastY;
+                camControl.lastX = cx;
+                camControl.lastY = cy;
+
+                if (camControl.isPanning) {
+                    camControl.desiredTarget.x -= dx * 0.003;
+                    camControl.desiredTarget.y += dy * 0.003;
+                } else {
+                    camControl.desiredTheta -= dx * 0.008;
+                    camControl.desiredPhi = Math.max(0.25, Math.min(1.48, camControl.desiredPhi - dy * 0.008));
+                }
+            }, { passive: true });
+
+            container.addEventListener('touchend', () => {
+                camControl.isDragging = false;
+                camControl.isPanning = false;
+            });
+        }
+
+        function initThreeJS() {
+            const container = document.getElementById('canvas-container');
+            if (!container) return;
+
+            bindCameraEvents(container);
+
+            if (typeof THREE === 'undefined') {
+                setupFallback2D(container);
+                return;
+            }
+
+            try {
+                scene = new THREE.Scene();
+                scene.background = new THREE.Color(0xdbeafe);
+
+                const width = Math.max(1, container.clientWidth);
+                const height = Math.max(1, container.clientHeight);
+                camera = new THREE.PerspectiveCamera(42, width / height, 0.05, 50);
+
+                renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+                renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+                renderer.setSize(width, height);
+                renderer.shadowMap.enabled = true;
+                renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+                container.innerHTML = '';
+                container.appendChild(renderer.domElement);
+
+                clock = new THREE.Clock();
+
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.72);
+                scene.add(ambientLight);
+
+                const dirLight = new THREE.DirectionalLight(0xffffff, 1.05);
+                dirLight.position.set(2.8, 4.5, 3.2);
+                dirLight.castShadow = true;
+                dirLight.shadow.mapSize.width = 1024;
+                dirLight.shadow.mapSize.height = 1024;
+                scene.add(dirLight);
+
+                const rimLight = new THREE.DirectionalLight(0x7dd3fc, 0.45);
+                rimLight.position.set(-3.0, 2.0, -2.5);
+                scene.add(rimLight);
+
+                const floor = new THREE.Mesh(
+                    new THREE.PlaneGeometry(14, 14),
+                    new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.85, metalness: 0.05 })
+                );
+                floor.rotation.x = -Math.PI / 2;
+                floor.receiveShadow = true;
+                scene.add(floor);
+
+                buildPeltonBench3D();
+
+                if (typeof ResizeObserver !== 'undefined') {
+                    resizeObserverInstance = new ResizeObserver(() => resizeCanvasSurface());
+                    resizeObserverInstance.observe(container);
+                }
+                window.addEventListener('resize', onWindowResize);
+            } catch (err) {
+                console.warn('Falha ao inicializar WebGL, alternando para Canvas 2D:', err);
+                setupFallback2D(container);
+            }
+        }
+
+        function drawFallback2DScene(elapsed) {
+            if (!fallbackCtx || !fallbackCanvas) return;
+            const dpr = Math.min(2, window.devicePixelRatio || 1);
+            const w = fallbackCanvas.width / dpr;
+            const h = fallbackCanvas.height / dpr;
+            const ctx = fallbackCtx;
+
+            const grad = ctx.createLinearGradient(0, 0, 0, h);
+            grad.addColorStop(0, '#dbeafe');
+            grad.addColorStop(1, '#e2e8f0');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, w, h);
+
+            const zoom = Math.max(0.6, Math.min(1.6, 3.35 / camControl.radius));
+            ctx.save();
+            ctx.translate(w * 0.5 + (0.15 - camControl.target.x) * 180 * zoom, h * 0.56 + (camControl.target.y - 0.92) * 180 * zoom);
+            ctx.scale(zoom, zoom);
+
+            // Bancada MF15
+            ctx.fillStyle = '#0f766e';
+            ctx.fillRect(-360, -70, 720, 175);
+            ctx.fillStyle = '#0284c7';
+            ctx.fillRect(-360, -70, 110, 175);
+            ctx.fillStyle = '#e2e8f0';
+            ctx.fillRect(-370, -82, 740, 14);
+
+            // Identificação institucional solicitada
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '800 20px Inter, sans-serif';
+            ctx.fillText('MF15 - ESTUDO DE TURBINA PELTON', -170, -46);
+            ctx.fillStyle = '#bae6fd';
+            ctx.font = '700 13px Inter, sans-serif';
+            ctx.fillText('UNISALESIANO DE ARAÇATUBA', -170, -26);
+
+            // Reservatório e água animada
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(-40, -15, 290, 105);
+            const waterOsc = Math.sin(elapsed * 3) * 3;
+            ctx.fillStyle = 'rgba(14, 165, 233, 0.55)';
+            ctx.fillRect(-38, 22 + waterOsc, 286, 66 - waterOsc);
+
+            // Rotor Pelton com 18 conchas
+            const rx = 135, ry = -135, rr = 52;
+            ctx.save();
+            ctx.translate(rx, ry);
+            ctx.rotate(rotorGroup ? rotorGroup.rotation.z : 0);
+            ctx.fillStyle = '#334155';
+            ctx.beginPath();
+            ctx.arc(0, 0, 26, 0, Math.PI * 2);
+            ctx.fill();
+
+            for (let i = 0; i < NUM_BUCKETS; i++) {
+                const a = (i / NUM_BUCKETS) * Math.PI * 2;
+                ctx.save();
+                ctx.rotate(a);
+                ctx.fillStyle = '#cbd5e1';
+                ctx.beginPath();
+                ctx.arc(0, -rr, 9, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+            ctx.restore();
+
+            // Jato d'água dinâmico
+            if (simState.v1 > 0.2 && simState.needleOpening > 0.02) {
+                const thick = Math.max(2, simState.needleOpening * 9);
+                ctx.fillStyle = 'rgba(56, 189, 248, 0.85)';
+                ctx.fillRect(25, ry - thick * 0.5, rx - rr - 25, thick);
+            }
+
+            ctx.restore();
+        }
+
+        // ============================================================================
+        // 4. MODELO FÍSICO E ATUALIZAÇÃO VISUAL
+        // ============================================================================
+        function updatePhysics(dt) {
+            const targetPump = (simState.pumpOn && !simState.emergency) ? 1.0 : 0.0;
+            const rampRate = targetPump > simState.pumpRamp ? 1.4 : 2.2;
+            simState.pumpRamp += (targetPump - simState.pumpRamp) * Math.min(1, dt * rampRate);
+
+            const freqNorm = simState.frequencyHz / 50.0;
+            simState.headM = 28.0 * Math.pow(freqNorm, 2) * simState.pumpRamp;
+            simState.pressureBar = (simState.headM * RHO * G) / 1e5;
+
+            const effectiveArea = (Math.PI * Math.pow(D_NOZZLE_MAX * 0.5, 2)) * Math.pow(simState.needleOpening, 1.35);
+            simState.v1 = CV_NOZZLE * Math.sqrt(Math.max(0, 2 * G * simState.headM));
+            simState.flowRateM3s = effectiveArea * simState.v1;
+
+            simState.hydraulicPower = RHO * G * simState.flowRateM3s * simState.headM;
+
+            simState.u = simState.omega * R_ROTOR;
+            simState.w1 = Math.max(0, simState.v1 - simState.u);
+            const eulerTorque = (simState.flowRateM3s > 1e-7 && simState.v1 > 0.05)
+                ? RHO * simState.flowRateM3s * R_ROTOR * (simState.v1 - simState.u) * (1 + K_BLADE * Math.cos(Math.PI - BETA2_RAD))
+                : 0;
+
+            const viscousDrag = 0.0012 * simState.omega;
+            const staticBrake = simState.omega < 0.5 ? Math.min(eulerTorque, simState.brakeTorque) : simState.brakeTorque;
+            const netTorque = eulerTorque - staticBrake - viscousDrag;
+
+            simState.omega = Math.max(0, simState.omega + (netTorque / J_ROTOR) * dt);
+            if (simState.omega < 0.02 && netTorque <= 0) {
+                simState.omega = 0;
+            }
+
+            simState.rpm = (simState.omega * 60) / (2 * Math.PI);
+            simState.u = simState.omega * R_ROTOR;
+            simState.w1 = Math.max(0, simState.v1 - simState.u);
+            simState.shaftTorque = simState.omega > 0.05 ? Math.max(0, eulerTorque - viscousDrag) : 0;
+            simState.mechanicalPower = simState.shaftTorque * simState.omega;
+            simState.efficiency = simState.hydraulicPower > 0.5
+                ? Math.min(92.0, Math.max(0, (simState.mechanicalPower / simState.hydraulicPower) * 100))
+                : 0;
+            simState.ratioUV = simState.v1 > 0.1 ? simState.u / simState.v1 : 0;
+        }
+
+        function updateVisuals(dt, elapsed) {
+            if (rotorGroup) {
+                rotorGroup.rotation.z -= simState.omega * dt;
+            }
+
+            if (needleMesh) {
+                needleMesh.position.x = 0.185 + simState.needleOpening * 0.045;
+            }
+
+            if (valveWheelMesh) {
+                valveWheelMesh.rotation.y = simState.needleOpening * Math.PI * 2;
+            }
+
+            if (manometerNeedle) {
+                const pNorm = Math.min(1, simState.pressureBar / 4.5);
+                manometerNeedle.rotation.z = 1.6 - pNorm * 3.2;
+            }
+
+            if (ledGreen && ledRed) {
+                ledGreen.material.emissive.setHex(simState.pumpOn && !simState.emergency ? 0x16a34a : 0x000000);
+                ledRed.material.emissive.setHex(simState.emergency ? 0xdc2626 : 0x000000);
+            }
+
+            if (waterTankMesh) {
+                waterTankMesh.position.y = 0.42 + Math.sin(elapsed * 2.8) * 0.008 * simState.pumpRamp;
+            }
+
+            if (jetMesh) {
+                const activeJet = simState.v1 > 0.2 && simState.needleOpening > 0.02;
+                jetMesh.visible = activeJet;
+                if (activeJet) {
+                    const thickness = Math.max(0.22, simState.needleOpening * 1.15);
+                    jetMesh.scale.set(thickness, 1, thickness);
+                }
+            }
+
+            if (splashParticles) {
+                const activeSplash = simState.v1 > 0.5 && simState.needleOpening > 0.03;
+                splashParticles.visible = activeSplash;
+                if (activeSplash) {
+                    const posAttr = splashParticles.geometry.getAttribute('position');
+                    const vels = splashParticles.userData.velocities;
+                    const ox = splashParticles.userData.originX;
+                    const oy = splashParticles.userData.originY;
+                    const oz = splashParticles.userData.originZ;
+                    const speedScale = Math.min(2.2, simState.v1 / 12);
+
+                    for (let i = 0; i < vels.length; i++) {
+                        vels[i].life += dt * 2.4 * speedScale;
+                        if (vels[i].life >= 1.0) {
+                            vels[i].life = 0;
+                            posAttr.array[i * 3] = ox;
+                            posAttr.array[i * 3 + 1] = oy;
+                            posAttr.array[i * 3 + 2] = oz;
+                        } else {
+                            posAttr.array[i * 3] += vels[i].vx * dt * speedScale;
+                            posAttr.array[i * 3 + 1] += (vels[i].vy - 1.8 * vels[i].life) * dt * speedScale;
+                            posAttr.array[i * 3 + 2] += vels[i].vz * dt * speedScale;
+                        }
+                    }
+                    posAttr.needsUpdate = true;
+                }
+            }
+        }
+
+        function updateCameraTransform() {
+            if (!camera) return;
+            camControl.theta += (camControl.desiredTheta - camControl.theta) * 0.12;
+            camControl.phi += (camControl.desiredPhi - camControl.phi) * 0.12;
+            camControl.radius += (camControl.desiredRadius - camControl.radius) * 0.12;
+            camControl.target.x += (camControl.desiredTarget.x - camControl.target.x) * 0.12;
+            camControl.target.y += (camControl.desiredTarget.y - camControl.target.y) * 0.12;
+            camControl.target.z += (camControl.desiredTarget.z - camControl.target.z) * 0.12;
+
+            const x = camControl.target.x + camControl.radius * Math.sin(camControl.phi) * Math.sin(camControl.theta);
+            const y = camControl.target.y + camControl.radius * Math.cos(camControl.phi);
+            const z = camControl.target.z + camControl.radius * Math.sin(camControl.phi) * Math.cos(camControl.theta);
+
+            camera.position.set(x, y, z);
+            camera.lookAt(camControl.target.x, camControl.target.y, camControl.target.z);
+        }
+
+        // ============================================================================
+        // 5. TELEMETRIA E CURVA CARACTERÍSTICA
+        // ============================================================================
+        function drawCharacteristicCurve() {
+            const canvas = document.getElementById('curve-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const w = Math.max(120, rect.width || 300);
+            const h = Math.max(90, rect.height || 160);
+            const dpr = Math.min(2, window.devicePixelRatio || 1);
+
+            if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+                canvas.width = Math.round(w * dpr);
+                canvas.height = Math.round(h * dpr);
+            }
+
+            ctx.save();
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.clearRect(0, 0, w, h);
+
+            const padL = 32, padR = 14, padT = 12, padB = 22;
+            const plotW = Math.max(40, w - padL - padR);
+            const plotH = Math.max(30, h - padT - padB);
+
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= 4; i++) {
+                const gy = padT + (plotH * i) / 4;
+                ctx.beginPath();
+                ctx.moveTo(padL, gy);
+                ctx.lineTo(padL + plotW, gy);
+                ctx.stroke();
+            }
+
+            const maxPower = Math.max(25, simState.hydraulicPower * 0.9);
+
+            // Curva teórica de rendimento η vs u/v1
+            ctx.strokeStyle = '#0d9488';
+            ctx.lineWidth = 2.2;
+            ctx.beginPath();
+            for (let s = 0; s <= 50; s++) {
+                const ratio = s / 50;
+                const effCurve = Math.max(0, 86 * (1 - Math.pow((ratio - 0.47) / 0.47, 2)));
+                const px = padL + ratio * plotW;
+                const py = padT + plotH - (effCurve / 100) * plotH;
+                if (s === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.stroke();
+
+            // Curva de potência mecânica Pₘ
+            ctx.strokeStyle = '#f59e0b';
+            ctx.lineWidth = 1.8;
+            ctx.beginPath();
+            for (let s = 0; s <= 50; s++) {
+                const ratio = s / 50;
+                const effCurve = Math.max(0, 86 * (1 - Math.pow((ratio - 0.47) / 0.47, 2)));
+                const pmCurve = (effCurve / 100) * simState.hydraulicPower;
+                const px = padL + ratio * plotW;
+                const py = padT + plotH - Math.min(1, pmCurve / maxPower) * plotH;
+                if (s === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.stroke();
+
+            // Eixos
+            ctx.strokeStyle = '#64748b';
+            ctx.lineWidth = 1.2;
+            ctx.beginPath();
+            ctx.moveTo(padL, padT);
+            ctx.lineTo(padL, padT + plotH);
+            ctx.lineTo(padL + plotW, padT + plotH);
+            ctx.stroke();
+
+            ctx.fillStyle = '#64748b';
+            ctx.font = '10px JetBrains Mono, monospace';
+            ctx.fillText('100%', 2, padT + 8);
+            ctx.fillText('0%', 10, padT + plotH);
+            ctx.fillText('0.0', padL - 6, padT + plotH + 13);
+            ctx.fillText('0.5', padL + plotW * 0.5 - 8, padT + plotH + 13);
+            ctx.fillText('1.0', padL + plotW - 14, padT + plotH + 13);
+
+            // Ponto atual de operação
+            const clampedRatio = Math.max(0, Math.min(1.0, simState.ratioUV));
+            const dotX = padL + clampedRatio * plotW;
+            const dotY = padT + plotH - Math.min(1, simState.efficiency / 100) * plotH;
+
+            ctx.fillStyle = '#e11d48';
+            ctx.beginPath();
+            ctx.arc(dotX, dotY, 5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        function updateTelemetryUI() {
+            const qLs = simState.flowRateM3s * 1000;
+            const qM3h = simState.flowRateM3s * 3600;
+
+            document.getElementById('tel-q-ls').textContent = qLs.toFixed(2);
+            document.getElementById('tel-q-m3h').textContent = qM3h.toFixed(2);
+            document.getElementById('tel-press').textContent = simState.pressureBar.toFixed(2);
+            document.getElementById('tel-head').textContent = simState.headM.toFixed(1);
+            document.getElementById('tel-v1').textContent = simState.v1.toFixed(1);
+            document.getElementById('tel-u').textContent = simState.u.toFixed(1);
+            document.getElementById('tel-rpm').textContent = Math.round(simState.rpm);
+            document.getElementById('tel-torque').textContent = simState.shaftTorque.toFixed(2);
+            document.getElementById('tel-ratio').textContent = simState.ratioUV.toFixed(2);
+            document.getElementById('tel-ph').textContent = Math.round(simState.hydraulicPower);
+            document.getElementById('tel-pm').textContent = Math.round(simState.mechanicalPower);
+            document.getElementById('tel-eff').textContent = simState.efficiency.toFixed(1);
+            document.getElementById('tel-bpf').textContent = simState.bpfHz.toFixed(1);
+
+            const noteEl = document.getElementById('didactic-note');
+            if (noteEl) {
+                if (!simState.pumpOn || simState.emergency) {
+                    noteEl.innerHTML = '<strong>Bancada em repouso:</strong> Acione <strong>LIGAR</strong> no painel esquerdo para pressurizar o bocal e iniciar o giro da turbina Pelton.';
+                } else if (Math.abs(simState.ratioUV - 0.47) < 0.06) {
+                    noteEl.innerHTML = '<strong>Regime próximo ao ponto ótimo (u/v₁ ≈ 0,47):</strong> A transferência de quantidade de movimento na concha Pelton ocorre com máximo rendimento.';
+                } else if (simState.ratioUV > 0.53) {
+                    noteEl.innerHTML = '<strong>Baixa carga no freio:</strong> O rotor gira mais rápido (u/v₁ elevado). Aumente o torque do freio para aproximar u/v₁ de 0,47.';
+                } else {
+                    noteEl.innerHTML = '<strong>Alta carga no freio:</strong> O torque resistente reduz o RPM e u/v₁. Reduza a frenagem para elevar a rotação e a potência.';
+                }
+            }
+
+            drawCharacteristicCurve();
+        }
+
+        // ============================================================================
+        // 6. COMANDOS DA INTERFACE E CONTROLES
+        // ============================================================================
+        function updateStatusUI() {
+            const badge = document.getElementById('status-badge');
+            const eBanner = document.getElementById('emergency-banner');
+            const eBtn = document.getElementById('btn-emergency');
+
+            if (simState.emergency) {
+                badge.textContent = 'EMERGÊNCIA';
+                badge.className = 'text-[11px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700 uppercase tracking-wider';
+                eBanner.classList.remove('hidden');
+                eBtn.classList.add('emergency-active');
+            } else if (simState.pumpOn) {
+                badge.textContent = 'OPERANDO';
+                badge.className = 'text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 uppercase tracking-wider';
+                eBanner.classList.add('hidden');
+                eBtn.classList.remove('emergency-active');
+            } else {
+                badge.textContent = 'STANDBY';
+                badge.className = 'text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600 uppercase tracking-wider';
+                eBanner.classList.add('hidden');
+                eBtn.classList.remove('emergency-active');
+            }
+        }
+
+        function startPump() {
+            playUiClickSound(620);
+            if (simState.emergency) return;
+            simState.pumpOn = true;
+            updateStatusUI();
+        }
+
+        function stopPump() {
+            playUiClickSound(400);
+            simState.pumpOn = false;
+            updateStatusUI();
+        }
+
+        function triggerEmergency() {
+            playEmergencyAlarmSound();
+            simState.emergency = true;
+            simState.pumpOn = false;
+            updateStatusUI();
+        }
+
+        function resetEmergency() {
+            playUiClickSound(560);
+            simState.emergency = false;
+            updateStatusUI();
+        }
+
+        function updateControls() {
+            const freq = parseFloat(document.getElementById('slider-freq').value);
+            const needle = parseFloat(document.getElementById('slider-needle').value);
+            const brake = parseFloat(document.getElementById('slider-brake').value);
+
+            simState.frequencyHz = freq;
+            simState.needleOpening = needle / 100.0;
+            simState.brakeTorque = brake;
+
+            document.getElementById('val-freq').textContent = `${freq.toFixed(0)} Hz`;
+            document.getElementById('val-needle').textContent = `${needle.toFixed(0)} %`;
+            document.getElementById('val-brake').textContent = `${brake.toFixed(2)} N·m`;
+        }
+
+        function setOptimalPoint() {
+            playUiClickSound(720);
+            if (simState.emergency) {
+                simState.emergency = false;
+            }
+            simState.pumpOn = true;
+            updateStatusUI();
+
+            const freqNorm = simState.frequencyHz / 50.0;
+            const headEst = 28.0 * Math.pow(freqNorm, 2);
+            const v1Est = CV_NOZZLE * Math.sqrt(Math.max(0, 2 * G * headEst));
+            const uOpt = 0.47 * v1Est;
+            const omegaOpt = uOpt / R_ROTOR;
+
+            const area = (Math.PI * Math.pow(D_NOZZLE_MAX * 0.5, 2)) * Math.pow(simState.needleOpening, 1.35);
+            const qEst = area * v1Est;
+            const optimalTorque = RHO * qEst * R_ROTOR * (v1Est - uOpt) * (1 + K_BLADE * Math.cos(Math.PI - BETA2_RAD));
+
+            simState.omega = omegaOpt;
+            const clampedTorque = Math.max(0, Math.min(6.0, optimalTorque));
+            document.getElementById('slider-brake').value = clampedTorque.toFixed(2);
+            updateControls();
+        }
+
+        function toggleLeftPanel() {
+            const panel = document.getElementById('left-panel');
+            if (panel) panel.classList.toggle('-translate-x-[120%]');
+        }
+
+        function toggleRightPanel() {
+            const panel = document.getElementById('right-panel');
+            if (panel) panel.classList.toggle('translate-x-[120%]');
+        }
+
+        function onWindowResize() {
+            resizeCanvasSurface();
+            drawCharacteristicCurve();
+        }
+
+        // ============================================================================
+        // 7. LOOP PRINCIPAL DE ANIMAÇÃO
+        // ============================================================================
+        function animate() {
+            requestAnimationFrame(animate);
+            const dt = Math.min(0.05, clock ? clock.getDelta() : 0.016);
+            const elapsed = clock ? clock.getElapsedTime() : (performance.now() * 0.001);
+
+            updatePhysics(dt);
+            updateSoundEngine();
+            updateVisuals(dt, elapsed);
+            updateTelemetryUI();
+            updateCameraTransform();
+
+            if (useCanvas2DFallback) {
+                drawFallback2DScene(elapsed);
+            } else if (renderer && scene && camera) {
+                renderer.render(scene, camera);
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', function () {
+            initThreeJS();
+            updateControls();
+            updateStatusUI();
+            updateAudioUI();
+
+            const unlockAudio = () => {
+                initSoundEngine();
+                updateAudioUI();
+                window.removeEventListener('pointerdown', unlockAudio);
+                window.removeEventListener('keydown', unlockAudio);
+            };
+            window.addEventListener('pointerdown', unlockAudio);
+            window.addEventListener('keydown', unlockAudio);
+
+            requestAnimationFrame(() => {
+                resizeCanvasSurface();
+                drawCharacteristicCurve();
+            });
+            animate();
+        });
+    </script>
+</body>
+</html>

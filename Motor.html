@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Simulador de motor de indução trifásico</title>
+<style>
+:root{--bg:#f1f3f9;--cd:#fff;--tx:#12162b;--mu:#566089;--ac:#d9480f;--ln:#d5dbee;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0a0e1f;--cd:#131a33;--tx:#e8ecff;--mu:#8e98c8;--ac:#ff8a3d;--ln:#28315a}}
+:root[data-theme="dark"]{--bg:#0a0e1f;--cd:#131a33;--tx:#e8ecff;--mu:#8e98c8;--ac:#ff8a3d;--ln:#28315a}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:560px;margin:0 auto;padding:12px 16px 32px}
+h1{font-size:22px;line-height:1.2;margin:4px 0 8px}
+.obj{color:var(--mu);font-size:14px;margin:0 0 12px}
+canvas{display:block;width:100%;height:auto;border-radius:14px}
+.leg{color:var(--mu);font-size:13px;margin:8px 0}
+#msg{background:var(--cd);border:1px solid var(--ln);border-left:4px solid var(--ac);border-radius:10px;padding:10px 12px;margin:10px 0;font-size:14px;min-height:62px}
+button{font:inherit;cursor:pointer;border:1px solid var(--ln);background:var(--cd);color:var(--tx);border-radius:10px;padding:9px 12px}
+button:focus-visible,input:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+button.sel,#pw.on{background:var(--ac);border-color:var(--ac);color:#fff}
+.row{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0;align-items:center}
+.row span{color:var(--mu);font-size:14px}
+#pw{font-weight:700;flex:1 1 140px}
+label{display:block;margin:12px 0}label span{display:flex;justify-content:space-between;font-size:14px;color:var(--mu)}label b{color:var(--tx)}
+input[type=range]{width:100%;accent-color:var(--ac);margin:4px 0}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}
+.stats div{background:var(--cd);border:1px solid var(--ln);border-radius:10px;padding:8px 4px;text-align:center}
+.stats b{display:block;font-size:20px}.stats small{color:var(--mu);font-size:12px}
+h2{font-size:16px;margin:18px 0 8px}
+</style></head><body>
+<main>
+<h1>Motor de indução trifásico</h1>
+<p class="obj"><b>Objetivo:</b> ver como as três correntes alternadas criam um campo magnético que gira e arrasta o rotor. Ligue o motor e mexa nos controles para ver o que muda.</p>
+<canvas id="m3" width="400" height="400" style="touch-action:none;display:none"></canvas><canvas id="mc"></canvas>
+<p class="leg">Anel laranja e turquesa: polos N e S do campo girante. Bobinas do estator (A, B, C): a seta, o ponto ou o x mostram o sentido da corrente. Na vista 3D, arraste para girar e use dois dedos ou a roda do mouse para aproximar. Barras do rotor: acendem quando há corrente induzida, que só existe com escorregamento.</p>
+<div id="msg" role="status"></div>
+<div class="row"><button id="pw">Ligar motor</button><button id="rv"></button><button id="rs">Reiniciar</button><button id="vw"></button></div>
+<div class="row"><span>Situações prontas:</span><button data-pre="0">Sem carga</button><button data-pre="1">Carga nominal</button><button data-pre="2">Vai travar</button></div>
+<div id="sl"></div>
+<div class="row"><span>Número de polos:</span><button data-p="2">2</button><button data-p="4">4</button><button data-p="6">6</button></div>
+<div class="stats">
+<div><small>Campo girante</small><b id="a1">0</b><small>rpm</small></div>
+<div><small>Rotor</small><b id="a2">0</b><small>rpm</small></div>
+<div><small>Escorregamento</small><b id="a3">0</b><small>%</small></div>
+<div><small>Torque</small><b id="a4">0</b><small>N·m</small></div>
+<div><small>Corrente</small><b id="a5">0</b><small>A (eficaz)</small></div>
+<div><small>Potência no eixo</small><b id="a6">0</b><small>kW</small></div>
+</div>
+<h2>Gráficos</h2>
+<canvas id="gc"></canvas>
+<p class="leg">Em cima, a velocidade do campo (tracejado) e a do rotor. Embaixo, as correntes das fases A, B e C. A animação roda em câmera lenta para dar para ver o campo girando.</p>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+var $=function(id){return document.getElementById(id)},D=Math.min(window.devicePixelRatio||1,2),R=Math.PI/180;
+function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+var st={on:0,dir:1,n:0,al:0,ph:0,V:380,f:60,L:0,p:2,SL:30,fm:0},Hs=[],HN=300,PC=['#ff5c7a','#f5c542','#6aa5ff'],sm=.18,TE=0,S=1,I=0,lastMsg='';
+var SD=[['V','Tensão da rede',50,440,' V'],['f','Frequência',10,90,' Hz'],['L','Carga no eixo',0,160,'% do nominal'],['SL','Câmera lenta',5,80,'x mais lenta']];
+var PRE=[[380,60,0],[380,60,100],[300,60,150]];
+var mc=$('mc'),gc=$('gc');mc.width=400*D;mc.height=400*D;gc.width=400*D;gc.height=300*D;
+SD.forEach(function(d){var l=document.createElement('label');l.innerHTML='<span>'+d[1]+'<em style="font-style:normal"><b id="v'+d[0]+'"></b>'+d[4]+'</em></span><input type="range" id="r'+d[0]+'" min="'+d[2]+'" max="'+d[3]+'">';$('sl').appendChild(l);
+$('r'+d[0]).oninput=function(e){st[d[0]]=+e.target.value;sync()}});
+function sync(){SD.forEach(function(d){$('r'+d[0]).value=st[d[0]];$('v'+d[0]).textContent=st[d[0]]});
+$('pw').textContent=st.on?'Desligar motor':'Ligar motor';$('vw').textContent=G3?'Vista '+(st.v3?'3D':'2D')+' (trocar)':'3D indisponível';$('m3').style.display=G3&&st.v3?'block':'none';$('mc').style.display=G3&&st.v3?'none':'block';$('pw').className=st.on?'on':'';
+$('rv').textContent='Sequência '+(st.dir>0?'ABC':'ACB')+' (trocar)';
+document.querySelectorAll('[data-p]').forEach(function(b){b.className=+b.dataset.p==st.p?'sel':''})}
+$('pw').onclick=function(){st.on=st.on?0:1;sync()};
+$('rv').onclick=function(){st.dir=-st.dir;sync()};
+$('rs').onclick=function(){st.on=0;st.n=0;st.al=0;st.ph=0;st.fm=0;st.dir=1;Hs.length=0;sync()};
+document.querySelectorAll('[data-p]').forEach(function(b){b.onclick=function(){st.p=+b.dataset.p;sync()}});
+document.querySelectorAll('[data-pre]').forEach(function(b){b.onclick=function(){var p=PRE[+b.dataset.pre];st.V=p[0];st.f=p[1];st.L=p[2];st.on=1;sync()}});
+function nsOf(){return st.dir*120*st.f/st.p}
+function phiOf(){return(st.V/380)/(st.f/60)}
+function torque(n){var ns=nsOf(),phi=Math.min(1.3,phiOf()),s=(ns-n)/ns;return{s:s,Te:st.on?Math.sign(ns)*2.4*phi*phi*2*s/(s*s/sm+sm):0}}
+function phys(dt){var ns=nsOf(),h=dt/10,i,q;
+for(i=0;i<10;i++){q=torque(st.n);var fr=st.L/100+.03+(st.on?0:.25*Math.abs(st.n)/1800);
+if(Math.abs(st.n)<2&&Math.abs(q.Te)<=fr)st.n=0;else st.n+=650*(q.Te-fr*Math.sign(st.n||q.Te))*h}
+q=torque(st.n);TE=q.Te;S=q.s;
+var sc=Math.min(Math.abs(S),2),phi=Math.min(1.3,phiOf());
+I=st.on?10*Math.hypot(4.3*phi*sc/Math.hypot(sc,sm),.35*phi):0;
+st.al+=st.n*6*dt/st.SL;if(st.on)st.ph+=ns*6*dt/st.SL;
+st.fm+=((st.on?clamp(phi,.35,1):0)-st.fm)*Math.min(1,dt*8)}
+function say(){var ns=nsOf(),s=S,pre='';
+if(st.on&&phiOf()>1.3)pre='Fluxo alto: tensão grande para essa frequência, o núcleo começa a saturar. ';
+if(!st.on)return Math.abs(st.n)>5?'Motor desligado: sem campo girante não há torque, e o rotor vai perdendo velocidade.':'Motor desligado. Toque em Ligar motor para aplicar as três fases.';
+if(Math.abs(st.n)<2&&Math.abs(TE)<=st.L/100+.03)return pre+'O motor não gira: o torque de partida é menor que a carga. A corrente fica muito alta, então desligue. Aumente a tensão ou reduza a carga.';
+if(s>1.02)return pre+'Sequência invertida: o campo gira ao contrário e freia o rotor (contracorrente) antes de fazê-lo girar para o outro lado.';
+if(s<-.01)return pre+'O rotor ficou mais rápido que o campo: o motor passa a funcionar como gerador e freia.';
+if(s>.5)return pre+'Partida: o rotor está lento em relação ao campo, então o escorregamento é grande e a corrente chega a vários vezes a nominal.';
+return pre+'Regime: o rotor gira um pouco abaixo da velocidade do campo (escorregamento de '+(s*100).toFixed(1)+'%). Sem essa diferença não haveria corrente induzida nem torque.'}
+function motor(){var c=mc.getContext('2d'),cx=200,cy=200,pp=st.p/2,fm=st.fm,sl=st.on?S:0,w=pp*st.ph*R,cn=[Math.cos(w),Math.cos(w-2.0944),Math.cos(w-4.1888)],j,i,k;
+c.setTransform(D,0,0,D,0,0);c.fillStyle='#0b1226';c.fillRect(0,0,400,400);
+c.beginPath();c.arc(cx,cy,194,0,7);c.fillStyle='#1a2347';c.fill();c.beginPath();c.arc(cx,cy,136,0,7);c.fillStyle='#0b1226';c.fill();
+var n=3*st.p,PH=[0,2,1,0,2,1],SG=[1,-1,1,-1,1,-1],LB=['A','B','C'];c.textAlign='center';
+for(j=0;j<n;j++){var th=j/n*6.2832,x=cx+162*Math.cos(th),y=cy-162*Math.sin(th),ph=PH[j%6],sg=SG[j%6],v=cn[ph]*sg*fm;
+c.beginPath();c.arc(x,y,12,0,7);c.fillStyle='rgba(238,242,255,'+Math.abs(v)*.9+')';c.fill();c.strokeStyle=PC[ph];c.lineWidth=2.5;c.stroke();
+if(Math.abs(v)>.2){c.fillStyle='#0b1226';c.strokeStyle='#0b1226';c.lineWidth=2;if(v>0){c.beginPath();c.arc(x,y,3,0,7);c.fill()}else{c.beginPath();c.moveTo(x-4,y-4);c.lineTo(x+4,y+4);c.moveTo(x+4,y-4);c.lineTo(x-4,y+4);c.stroke()}}
+c.fillStyle=PC[ph];c.font='10px system-ui,sans-serif';c.fillText(LB[ph]+(sg<0?'\u2032':''),cx+184*Math.cos(th),cy-184*Math.sin(th)+3)}
+c.lineWidth=22;
+for(i=0;i<120;i++){var a=i*3,B=Math.cos(pp*(a+1.5-st.ph)*R)*fm;c.strokeStyle=B>0?'rgba(255,138,61,'+B+')':'rgba(61,214,196,'+(-B)+')';c.beginPath();c.arc(cx,cy,121,-(a+3.2)*R,-a*R);c.stroke()}
+if(fm>.3){c.fillStyle='#fff';c.font='bold 11px system-ui,sans-serif';for(k=0;k<st.p;k++){var ta=(st.ph+k*180/pp)*R;c.fillText(k%2?'S':'N',cx+121*Math.cos(ta),cy-121*Math.sin(ta)+4)}}
+c.save();c.translate(cx,cy);c.rotate(-st.al*R);c.beginPath();c.arc(0,0,106,0,7);c.fillStyle='#27325f';c.fill();
+var sa=Math.min(1,Math.abs(sl)*4);
+for(k=0;k<16;k++){var ba=k*22.5,g=Math.sin(pp*(ba+st.al-st.ph)*R)*sa*fm;c.beginPath();c.arc(88*Math.cos(ba*R),-88*Math.sin(ba*R),6,0,7);c.fillStyle=Math.abs(g)<.05?'#4a5690':g>0?'rgba(255,200,80,'+(.3+.7*g)+')':'rgba(150,120,255,'+(.3-.7*g)+')';c.fill()}
+c.strokeStyle='#fff';c.lineWidth=3;c.beginPath();c.moveTo(0,0);c.lineTo(100,0);c.stroke();c.restore();
+c.beginPath();c.arc(cx,cy,16,0,7);c.fillStyle='#cfd6ff';c.fill()}
+function graph(){var c=gc.getContext('2d');c.setTransform(D,0,0,D,0,0);c.fillStyle='#0b1226';c.fillRect(0,0,400,300);
+var mv=Math.max(600,Hs.reduce(function(m,r){return Math.max(m,Math.abs(r[0]),Math.abs(r[1]))},0))*1.1,mi=Math.max(20,Hs.reduce(function(m,r){return Math.max(m,Math.abs(r[2]),Math.abs(r[3]),Math.abs(r[4]))},0))*1.1;
+function P(y0,h,key,col,mx,dash){c.strokeStyle=col;c.lineWidth=2;c.setLineDash(dash||[]);c.beginPath();Hs.forEach(function(r,i){var x=40+i/HN*350,y=y0+h/2-r[key]/mx*h/2;i?c.lineTo(x,y):c.moveTo(x,y)});c.stroke();c.setLineDash([])}
+function AX(y0,h,mx,t,u){c.strokeStyle='#28315a';c.lineWidth=1;c.beginPath();c.moveTo(40,y0+h/2);c.lineTo(390,y0+h/2);c.moveTo(40,y0);c.lineTo(40,y0+h);c.stroke();
+c.fillStyle='#8e98c8';c.font='10px system-ui,sans-serif';c.textAlign='right';c.fillText(Math.round(mx),36,y0+8);c.fillText('0',36,y0+h/2+3);c.fillText(Math.round(-mx),36,y0+h-1);c.textAlign='left';c.font='12px system-ui,sans-serif';c.fillText(t,40,y0-8)}
+AX(26,110,mv,'Velocidade (rpm)');P(26,110,1,'#ff8a3d',mv,[6,4]);P(26,110,0,'#fff',mv);
+AX(176,110,mi,'Correntes das fases (A)');P(176,110,2,PC[0],mi);P(176,110,3,PC[1],mi);P(176,110,4,PC[2],mi);
+c.font='11px system-ui,sans-serif';[['A',0],['B',1],['C',2]].forEach(function(p){c.fillStyle=PC[p[1]];c.fillText(p[0],330+p[1]*20,168)})}
+var G3=0,motor3=null;
+(function(){try{if(!window.THREE)return;var c=$('m3'),r=new THREE.WebGLRenderer({canvas:c,antialias:true});r.setPixelRatio(D);r.setClearColor(0x0b1226);
+var sc=new THREE.Scene(),cam=new THREE.PerspectiveCamera(38,1,.1,60),cl=new THREE.Color(),lw=0,lp=0,co=[],az=.55,el=.3,dist=8.6,pt=new Map(),pd=0,k,i;
+sc.add(new THREE.AmbientLight(0xffffff,.8));var dl=new THREE.DirectionalLight(0xffffff,.8);dl.position.set(4,6,8);sc.add(dl);
+function zc(g){g.rotateX(Math.PI/2);return g}
+function M(o){return new THREE.MeshStandardMaterial(o)}
+sc.add(new THREE.Mesh(zc(new THREE.CylinderGeometry(2.05,2.05,2.3,64,1,true)),M({color:0x4a5aa0,transparent:true,opacity:.16,side:THREE.DoubleSide,depthWrite:false})));
+var fl=new THREE.Mesh(new THREE.BoxGeometry(5,.2,3.4),M({color:0x1a2347}));fl.position.y=-2.3;sc.add(fl);
+var ro=new THREE.Group(),bars=[];sc.add(ro);
+ro.add(new THREE.Mesh(zc(new THREE.CylinderGeometry(1.15,1.15,2.1,48)),M({color:0x27325f,metalness:.4,roughness:.5})));
+ro.add(new THREE.Mesh(zc(new THREE.CylinderGeometry(.18,.18,3.8,16)),M({color:0xcfd6ff,metalness:.6,roughness:.3})));
+var mk=new THREE.Mesh(new THREE.BoxGeometry(.9,.1,.05),new THREE.MeshBasicMaterial({color:0xffffff}));mk.position.set(.65,0,1.08);ro.add(mk);
+for(k=0;k<16;k++){var b=new THREE.Mesh(new THREE.BoxGeometry(.16,.16,2.12),M({color:0x4a5690}));b.position.set(1.18*Math.cos(k*22.5*R),1.18*Math.sin(k*22.5*R),0);ro.add(b);bars.push(b)}
+var NR=96,fr=new THREE.InstancedMesh(new THREE.BoxGeometry(.1,.1,1.9),new THREE.MeshBasicMaterial({blending:THREE.AdditiveBlending,transparent:true,depthWrite:false}),NR),m4=new THREE.Matrix4(),q=new THREE.Quaternion(),eu=new THREE.Euler();
+for(i=0;i<NR;i++){var t0=i/NR*6.2832;eu.set(0,0,t0+1.5708);q.setFromEuler(eu);m4.compose(new THREE.Vector3(1.4*Math.cos(t0),1.4*Math.sin(t0),0),q,new THREE.Vector3(1,1,1));fr.setMatrixAt(i,m4);fr.setColorAt(i,cl.setRGB(0,0,0))}
+sc.add(fr);
+var cg=new THREE.Group();sc.add(cg);
+function bc(){while(cg.children.length)cg.remove(cg.children[0]);co=[];var n=3*st.p,PH=[0,2,1,0,2,1],j;
+for(j=0;j<n;j++){var t=j/n*6.2832,p=PH[j%6],g=new THREE.Group(),m=M({color:new THREE.Color(PC[p]).multiplyScalar(.5)}),a=new THREE.Mesh(new THREE.ConeGeometry(.11,.4,12),new THREE.MeshBasicMaterial({color:0xffffff}));
+g.add(new THREE.Mesh(new THREE.BoxGeometry(.3,.3,1.9),m));a.position.x=.3;g.add(a);g.position.set(1.7*Math.cos(t),1.7*Math.sin(t),0);g.rotation.z=t;cg.add(g);co.push({m:m,a:a,p:p,s:[1,-1,1,-1,1,-1][j%6]})}}
+c.onpointerdown=function(e){c.setPointerCapture(e.pointerId);pt.set(e.pointerId,[e.clientX,e.clientY])};
+c.onpointermove=function(e){var o=pt.get(e.pointerId);if(!o)return;var n=[e.clientX,e.clientY];if(pt.size==1){az-=(n[0]-o[0])*.01;el=clamp(el+(n[1]-o[1])*.01,-1.4,1.4)}pt.set(e.pointerId,n);
+if(pt.size==2){var v=Array.from(pt.values()),d=Math.hypot(v[0][0]-v[1][0],v[0][1]-v[1][1]);if(pd)dist=clamp(dist*pd/d,4.5,16);pd=d}};
+c.onpointerup=c.onpointercancel=function(e){pt.delete(e.pointerId);pd=0};
+c.onwheel=function(e){e.preventDefault();dist=clamp(dist*(1+e.deltaY*.001),4.5,16)};
+motor3=function(){var w0=c.clientWidth;if(w0&&w0!=lw){lw=w0;r.setSize(w0,w0,false)}
+if(lp!=st.p){lp=st.p;bc()}
+var pp=st.p/2,fm=st.fm,sl=st.on?S:0,w=pp*st.ph*R,cn=[Math.cos(w),Math.cos(w-2.0944),Math.cos(w-4.1888)],sa=Math.min(1,Math.abs(sl)*4);
+co.forEach(function(o){var v=cn[o.p]*o.s*fm,a=Math.abs(v);o.m.emissive.setHex(v>0?0xffc864:0x9a7bff);o.m.emissiveIntensity=a;o.a.visible=a>.15;o.a.rotation.x=v>0?1.5708:-1.5708;o.a.scale.setScalar(.5+a*.7)});
+for(i=0;i<NR;i++){var B=Math.cos(pp*(i*3.75+1.9-st.ph)*R)*fm;fr.setColorAt(i,B>0?cl.setRGB(B,.54*B,.24*B):cl.setRGB(-.24*B,-.84*B,-.77*B))}fr.instanceColor.needsUpdate=true;
+bars.forEach(function(b,k){var g=Math.sin(pp*(k*22.5+st.al-st.ph)*R)*sa*fm;b.material.emissive.setHex(g>0?0xffc850:0x9678ff);b.material.emissiveIntensity=Math.abs(g)<.05?0:.3+.7*Math.abs(g)});
+ro.rotation.z=st.al*R;
+cam.position.set(dist*Math.cos(el)*Math.sin(az),dist*Math.sin(el),dist*Math.cos(el)*Math.cos(az));cam.lookAt(0,0,0);r.render(sc,cam)};
+G3=1;st.v3=1}catch(e){G3=0}})();
+$('vw').onclick=function(){if(G3){st.v3=!st.v3;sync()}};
+var last=0;
+function loop(now){requestAnimationFrame(loop);var dt=Math.min(.05,(now-last)/1000||0);last=now;
+phys(dt);var ns=nsOf(),w=st.p/2*st.ph*R,amp=1.4142*I;
+Hs.push([st.n,st.on?ns:0,amp*Math.cos(w),amp*Math.cos(w-2.0944),amp*Math.cos(w-4.1888)]);if(Hs.length>HN)Hs.shift();
+if(G3&&st.v3)motor3();else motor();graph();
+$('a1').textContent=Math.round(st.on?ns:0);$('a2').textContent=Math.round(st.n);$('a3').textContent=st.on?(S*100).toFixed(1):'-';
+$('a4').textContent=(TE*20).toFixed(1);$('a5').textContent=I.toFixed(1);$('a6').textContent=(TE*20*st.n*.10472/1000).toFixed(2);
+var m=say();if(m!=lastMsg){$('msg').textContent=m;lastMsg=m}}
+sync();requestAnimationFrame(loop);
+</script></body></html>

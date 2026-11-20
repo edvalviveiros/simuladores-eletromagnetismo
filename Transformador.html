@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Laboratório Virtual — Transformadores</title>
+<style>
+:root{--bg:#071321;--panel:#102238;--panel2:#142b43;--line:#29435d;--text:#eef6ff;--muted:#a8bdd0;--cyan:#37c8ff;--red:#ff665f;--blue:#45a9ff;--yellow:#ffd43b;--green:#4cdb9a}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 50% -10%,#173653,#071321 55%);color:var(--text);font:15px/1.45 Inter,system-ui,Segoe UI,Arial,sans-serif}
+header{padding:22px clamp(16px,3vw,42px) 14px;border-bottom:1px solid #223a52;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}.logo{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#ffd43b,#ff8c36);display:grid;place-items:center;color:#132033;font-size:22px;font-weight:900}
+h1{font-size:clamp(20px,2.4vw,29px);margin:0;letter-spacing:-.5px}header p{margin:3px 0 0;color:var(--muted);font-size:13px}.pill{border:1px solid #35516d;border-radius:99px;padding:7px 12px;color:#c9d9e8;font-size:12px}
+main{max-width:1500px;margin:auto;padding:20px clamp(12px,2.5vw,34px) 50px}.layout{display:grid;grid-template-columns:275px minmax(360px,1fr) 280px;gap:16px;align-items:stretch}
+.panel{background:linear-gradient(180deg,#11273d,#0d2033);border:1px solid var(--line);border-radius:18px;padding:17px;box-shadow:0 14px 35px #0003}.panel h2{font-size:16px;margin:0 0 14px}.eyebrow{font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--cyan);font-weight:800;margin-bottom:6px}
+.field{margin:13px 0}.field label{display:flex;justify-content:space-between;color:#c6d6e5;font-size:13px;margin-bottom:6px}.field input{width:100%;background:#071727;border:1px solid #34516d;border-radius:9px;padding:11px;color:white;font:600 15px inherit;outline:none}.field input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px #37c8ff22}
+.btn{border:0;border-radius:10px;padding:11px 13px;font-weight:800;cursor:pointer;background:linear-gradient(135deg,#ffd43b,#ffad32);color:#172335}.btn.secondary{background:#1a3853;color:#e6f2ff;border:1px solid #355571}.btnrow{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}.btnrow .btn:first-child{grid-column:1/-1}
+.scenePanel{padding:0;overflow:hidden;min-height:570px;display:flex;flex-direction:column}.sceneTop{padding:16px 18px 0;display:flex;justify-content:space-between;align-items:center;gap:10px}.sceneTop h2{margin:0}.legend{display:flex;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:11px}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}.scene{height:480px;min-height:400px;position:relative;background:radial-gradient(ellipse at 50% 45%,#1c3a54,#0a1b2b 70%)}#three{width:100%;height:100%;display:block}.sceneHint{position:absolute;bottom:12px;left:14px;color:#9db4c9;font-size:11px;background:#071321b8;padding:7px 10px;border-radius:8px;pointer-events:none}.sceneControls{display:flex;gap:7px;padding:0 16px 14px}.sceneControls button{padding:7px 10px;font-size:12px}
+.result{border-radius:13px;background:#071827;border:1px solid #29445e;padding:13px;margin:10px 0}.result small{color:var(--muted);display:block;font-size:11px}.big{font-size:30px;font-weight:900;letter-spacing:-1px;margin:3px 0}.status{font-size:12px;font-weight:800;padding:7px 9px;border-radius:8px;display:inline-block;background:#123e3a;color:#72f0bd}.formula{font:13px ui-monospace,monospace;color:#ffe28a;background:#071522;padding:10px;border-radius:9px;overflow-wrap:anywhere}
+.statline{display:flex;justify-content:space-between;color:#c5d5e4;font-size:12px;padding:7px 0;border-bottom:1px solid #20394f}.statline strong{color:white}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:20px 0 14px}.tab{background:#10263b;border:1px solid #29435d;color:#c7d8e8;border-radius:99px;padding:9px 14px;cursor:pointer;font-weight:700}.tab.active{background:#ffd43b;color:#142238;border-color:#ffd43b}
+.lower{display:grid;grid-template-columns:1fr 1fr;gap:16px}.content{display:none}.content.active{display:block}.challengeQuestion{font-size:17px;font-weight:800;margin:8px 0 14px}.feedback{min-height:24px;font-size:13px;color:var(--muted);margin-top:10px}.score{color:var(--yellow);font-weight:900}.examples{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.example{background:#0a1b2b;border:1px solid #29445d;border-radius:12px;padding:12px}.example strong{display:block;font-size:13px}.example b{font-size:21px;color:var(--yellow)}.learnGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.learn{padding:13px;border:1px solid #29445d;border-radius:12px;background:#0a1b2b}.learn h3{font-size:14px;margin:0 0 5px}.learn p{font-size:12px;color:var(--muted);margin:0}
+.notice{font-size:11px;color:#f4dca0;background:#332b16;border:1px solid #68551d;border-radius:10px;padding:10px;margin-top:14px}
+@media(max-width:1050px){.layout{grid-template-columns:250px 1fr}.resultPanel{grid-column:1/-1}.resultPanel .resultWrap{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.resultPanel .formula{grid-column:1/-1}}
+@media(max-width:700px){header{padding:16px}.layout{grid-template-columns:1fr}.scenePanel{grid-row:1;min-height:430px}.scene{height:390px;min-height:350px}.resultPanel{grid-column:auto}.resultPanel .resultWrap{display:block}.lower{grid-template-columns:1fr}.examples,.learnGrid{grid-template-columns:1fr}.pill{display:none}}
+
+
+.scopePanel{background:linear-gradient(180deg,#10283c,#091a29);border:1px solid #3b607b;border-radius:12px;padding:9px;box-shadow:0 10px 28px #0009}
+.scopeFloat{position:relative;z-index:1;margin:0 14px 14px auto;width:min(360px,calc(100% - 28px));backdrop-filter:blur(8px)}
+.scopeHead{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:5px}
+.scopeTitle{font-size:11px;letter-spacing:1px;font-weight:900;color:#eaf5ff}
+.scopeSub{font-size:10px;color:#9fb5c8;margin-top:1px}
+.scopeMin{width:25px;height:23px;border-radius:6px;border:1px solid #42617b;background:#18364e;color:#fff;font-size:17px;line-height:15px;cursor:pointer}
+.scopeLegend{display:flex;gap:10px;flex-wrap:wrap;font-size:10px;color:#c8d9e8;margin:5px 0}
+.scopeLegend span{display:flex;align-items:center;gap:4px}.scopeLegend i{width:12px;height:2px;border-radius:3px;display:inline-block}
+.scopeScreen{background:#06131b;border:1px solid #34536a;border-radius:7px;overflow:hidden;padding:3px}
+#scopeCanvas{display:block;width:100%;height:112px}
+.scopeReadouts{display:flex;gap:5px;margin-top:5px}
+.scopeReadout{flex:1;min-width:0;background:#081a29;border:1px solid #29445d;border-radius:6px;padding:4px 5px;font-size:9px;color:#a8bdd0}
+.scopeReadout strong{display:block;color:#fff;font-size:10px;margin-top:1px}
+.scopeFloat.minimized{width:155px;padding:7px 9px}
+.scopeFloat.minimized .scopeBody{display:none}
+@media(max-width:700px){.scopeFloat{width:calc(100% - 20px);margin:0 10px 10px}.scopeFloat #scopeCanvas{height:105px}.scopeFloat.minimized{width:155px;margin-left:auto}}
+
+/* Layout de bancada: mantém controles, modelo 3D, osciloscópio e resultados na mesma tela. */
+@media (min-width:1051px) and (min-height:650px){
+ html,body{height:100%;overflow:hidden}
+ header{height:68px;min-height:68px;padding:8px clamp(14px,2vw,28px);flex-wrap:nowrap}
+ .logo{width:36px;height:36px;border-radius:10px;font-size:19px}
+ h1{font-size:clamp(18px,1.8vw,24px)}
+ header p{font-size:11px}
+ main{height:calc(100dvh - 68px);padding:10px clamp(10px,1.5vw,22px)}
+ .layout{height:100%;grid-template-columns:minmax(220px,250px) minmax(0,1fr) minmax(230px,260px);gap:10px;align-items:stretch}
+ .panel{min-width:0;padding:12px;border-radius:14px}
+ .panel h2{font-size:14px;margin-bottom:9px}
+ .eyebrow{font-size:9px;margin-bottom:4px}
+ .field{margin:9px 0}
+ .field label{font-size:11px;margin-bottom:4px}
+ .field input{padding:8px;font-size:13px}
+ .btn{padding:8px 9px;font-size:11px}
+ .btnrow{gap:6px;margin-top:10px}
+ .notice{font-size:9px;padding:8px;margin-top:10px}
+ .scenePanel{min-height:0;height:100%;padding:0;display:flex;flex-direction:column}
+ .sceneTop{padding:10px 12px 0}
+ .sceneTop h2{font-size:14px}
+ .legend{font-size:9px;gap:8px}
+ .scene{flex:1 1 auto;height:auto;min-height:150px}
+ .sceneHint{font-size:9px;bottom:8px;left:9px;padding:5px 7px}
+ .sceneControls{flex-wrap:wrap;gap:5px;padding:7px 10px}
+ .sceneControls button{padding:6px 8px;font-size:10px}
+ .scopeFloat{flex:0 0 auto;width:min(320px,calc(100% - 20px));margin:0 10px 10px auto;padding:7px}
+ .scopeTitle{font-size:10px}
+ .scopeSub{font-size:9px}
+ .scopeLegend{font-size:9px;margin:3px 0}
+ .scopeScreen{padding:2px}
+ #scopeCanvas{height:72px}
+ .scopeReadouts{gap:4px;margin-top:4px}
+ .scopeReadout{padding:3px 4px;font-size:8px}
+ .scopeReadout strong{font-size:9px}
+ .result{padding:9px;margin:7px 0}
+ .result small{font-size:9px}
+ .big{font-size:24px;margin:1px 0}
+ .status{font-size:10px;padding:5px 7px}
+ .formula{font-size:10px;padding:8px}
+ .statline{font-size:10px;padding:5px 0}
+}
+@media (min-width:1051px) and (max-height:649px){
+ header{padding-top:6px;padding-bottom:6px}
+ main{padding-top:8px;padding-bottom:8px}
+ .layout{gap:8px}
+ .panel{padding:10px}
+ .scenePanel{min-height:0}
+ .scene{height:260px;min-height:220px}
+ .scopeFloat{width:290px}
+ #scopeCanvas{height:65px}
+}
+
+
+/* Simulação dividida: transformador 3D à esquerda e osciloscópio à direita. */
+.simSplit{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(280px,.85fr);gap:10px;flex:1 1 auto;min-height:0;padding:10px}
+.scenePanel{min-height:0}
+.scene{height:auto;min-height:0;position:relative;overflow:hidden;border:1px solid #29445d;border-radius:12px}
+.sceneLabel{position:absolute;z-index:2;top:10px;left:12px;font-size:10px;letter-spacing:1px;font-weight:900;color:#a9bfd1;background:#071321b8;padding:5px 7px;border-radius:6px;pointer-events:none}
+.scopeFloat{width:auto;margin:0;min-width:0;display:flex;flex-direction:column;justify-content:center;align-self:stretch}
+.scopeFloat .scopeBody{min-width:0}
+.scopeFloat #scopeCanvas{height:clamp(150px,27vh,260px)}
+.scopeScreen{flex:0 0 auto}
+.sceneControls{flex-wrap:wrap}
+@media (min-width:1051px) and (min-height:650px){
+ .scenePanel{display:flex;flex-direction:column;height:100%}
+ .simSplit{flex:1 1 auto}
+ .scene{min-height:0}
+ .scopeFloat{padding:10px}
+ .scopeFloat #scopeCanvas{height:clamp(160px,28vh,270px)}
+}
+@media (max-width:1050px){
+ .simSplit{grid-template-columns:minmax(0,1fr) minmax(250px,.9fr)}
+ .scopeFloat #scopeCanvas{height:180px}
+}
+@media (max-width:700px){
+ .simSplit{grid-template-columns:1fr;grid-template-rows:minmax(300px,1fr) auto}
+ .scene{height:340px;min-height:300px}
+ .scopeFloat{min-height:0}
+ .scopeFloat #scopeCanvas{height:150px}
+ .scenePanel{min-height:0}
+}
+
+</style>
+</head>
+<body>
+<header><div class="brand"><div class="logo">Φ</div><div><h1>Laboratório Virtual de Transformadores</h1><p>Explore a relação entre tensão, espiras e indução eletromagnética</p></div></div><span class="pill">SIMULAÇÃO EDUCACIONAL · TRANSFORMADOR IDEAL</span></header>
+<main>
+<div class="layout">
+<section class="panel">
+<div class="eyebrow">Experimento</div><h2>Configuração elétrica</h2>
+<div class="field"><label for="v1">Tensão de entrada <b>V₁ (volts)</b></label><input id="v1" type="number" min="0.1" step="1" value="220"></div>
+<div class="field"><label for="n1">Espiras do primário <b>N₁</b></label><input id="n1" type="number" min="1" step="1" value="1000"></div>
+<div class="field"><label for="n2">Espiras do secundário <b>N₂</b></label><input id="n2" type="number" min="1" step="1" value="500"></div>
+<div class="btnrow"><button class="btn" id="calculate">Atualizar cálculo</button><button class="btn secondary" id="reset">Reiniciar</button></div>
+<div class="notice">Atenção: modelo matemático ideal para aprendizagem. Não representa ligação a rede elétrica nem deve ser usado para dimensionamento ou intervenção em equipamentos reais.</div>
+</section>
+<section class="panel scenePanel">
+<div class="sceneTop"><div><div class="eyebrow">Simulação interativa</div><h2>Transformador e osciloscópio</h2></div></div>
+<div class="simSplit">
+ <div class="scene">
+  <div class="sceneLabel">TRANSFORMADOR 3D</div>
+  <canvas id="three"></canvas>
+  <div class="sceneHint">Arraste para girar · Role para aproximar · Botão direito para deslocar</div>
+ </div>
+ <div class="scopePanel scopeFloat" id="scopeWindow">
+  <div class="scopeHead">
+   <div><div class="scopeTitle">OSCILOSCÓPIO MONOFÁSICO</div><div class="scopeSub">Tensão alternada · 60 Hz · 1 fase</div></div>
+   <button class="scopeMin" id="scopeMin" aria-label="Minimizar osciloscópio">−</button>
+  </div>
+  <div class="scopeBody" id="scopeBody">
+   <div class="scopeLegend">
+    <span><i style="background:#ff665f"></i>CH1 · V₁ (primário)</span>
+    <span><i style="background:#45a9ff"></i>CH2 · V₂ (secundário)</span>
+   </div>
+   <div class="scopeScreen"><canvas id="scopeCanvas"></canvas></div>
+   <div class="scopeReadouts">
+    <div class="scopeReadout">CH1 · V₁ RMS<strong id="scopeV1">220 V</strong></div>
+    <div class="scopeReadout">CH2 · V₂ RMS<strong id="scopeV2">110 V</strong></div>
+    <div class="scopeReadout">FREQUÊNCIA<strong id="scopeFreq">60 Hz</strong></div>
+   </div>
+  </div>
+ </div>
+</div>
+<div class="sceneControls"><button class="btn secondary" id="rotate">⟳ Rotacionar</button><button class="btn secondary" id="flow">◉ Fluxo magnético: ligado</button><button class="btn secondary" id="voltage">ϟ Tensão nas bobinas: ligada</button><button class="btn secondary" id="homeView">Vista inicial</button></div>
+</section>
+<section class="panel resultPanel">
+<div class="eyebrow">Leitura do sistema</div><h2>Resultados do experimento</h2>
+<div class="resultWrap">
+<div class="result"><small>Tensão de entrada · V₁</small><div class="big" id="outV1">220 V</div><small id="outN1">1.000 espiras no primário</small></div>
+<div class="result"><small>Tensão de saída · V₂</small><div class="big" id="outV2">110 V</div><small id="outN2">500 espiras no secundário</small></div>
+<div class="result"><small>Classificação</small><div style="margin:8px 0"><span class="status" id="kind">Abaixador</span></div><small id="ratio">Relação de transformação: 2,00 : 1</small></div>
+<div class="formula" id="formula">V₂ = V₁ × (N₂ / N₁)<br>V₂ = 220 × (500 / 1.000) = 110 V</div>
+</div>
+<div class="statline"><span>Relação N₂ / N₁</span><strong id="turnRatio">0,50</strong></div><div class="statline"><span>Variação da tensão</span><strong id="variation">−50%</strong></div><div class="statline"><span>Modelo</span><strong>Transformador ideal</strong></div>
+</section>
+</div>
+
+
+
+</main>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+const $=id=>document.getElementById(id);
+const canvas=$('three'),scene=new THREE.Scene();scene.background=new THREE.Color(0x0b1c2b);
+const camera=new THREE.PerspectiveCamera(38,1,.1,100);camera.position.set(7.2,5.2,8.6);
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.outputColorSpace=THREE.SRGBColorSpace;
+const controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;controls.target.set(0,0,0);controls.minDistance=5;controls.maxDistance=24;
+scene.add(new THREE.HemisphereLight(0xd9edff,0x35485b,2.7));const key=new THREE.DirectionalLight(0xffffff,4);key.position.set(5,8,7);scene.add(key);const fill=new THREE.PointLight(0x43aaff,35);fill.position.set(-5,2,3);scene.add(fill);
+const root=new THREE.Group();scene.add(root);
+const metal=new THREE.MeshStandardMaterial({color:0x8996a2,metalness:.82,roughness:.34,emissive:0x16466d,emissiveIntensity:.08});
+const copperRed=new THREE.MeshStandardMaterial({color:0xff503f,metalness:.78,roughness:.23,emissive:0x3b0804});
+const copperBlue=new THREE.MeshStandardMaterial({color:0x229cff,metalness:.72,roughness:.22,emissive:0x031a3b});
+const dark=new THREE.MeshStandardMaterial({color:0x253747,metalness:.6,roughness:.45});
+function box(w,h,d,x,y,z,mat,parent=root){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,z);parent.add(m);return m}
+function makeCore(){
+ // Pilha de lâminas em forma de quadro: cada lâmina é um quadro retangular com janela central.
+ for(let i=0;i<18;i++){const g=new THREE.Group();g.position.z=(i-8.5)*.075;const w=4.7,h=4.2,t=.52,depth=.055;
+ box(w,h,depth,0,0,0,metal,g);box(w-2*t,h-2*t,depth+.01,0,0,0,new THREE.MeshStandardMaterial({color:0x0b1c2b,metalness:.1,roughness:1}),g);
+ // quatro travessas sobrepostas criam a abertura real do núcleo
+ const pieces=[ [w,t,0,h/2-t/2],[w,t,0,-h/2+t/2],[t,h-2*t,-w/2+t/2,0],[t,h-2*t,w/2-t/2,0] ];
+ g.clear();for(const [a,b,x,y] of pieces)box(a,b,depth,x,y,0,metal,g);
+ root.add(g);
+ }
+}
+makeCore();
+function coil(side,turns,mat){
+ // Cada enrolamento abraça a sua própria perna vertical do núcleo:
+ // primário na perna esquerda e secundário na perna direita.
+ const x=side==='p'?-2.08:2.08, maxLoops=22;
+ const loops=Math.max(6,Math.min(maxLoops,Math.round(6+Math.log10(Math.max(1,turns))*4)));
+ const group=new THREE.Group();group.position.x=x;root.add(group);
+ const coilMat=mat.clone();group.userData.voltageMaterial=coilMat;group.userData.side=side;group.userData.voltageDots=[];
+ // Espiras circulares em torno do eixo vertical da perna de ferro.
+ for(let j=0;j<loops;j++){
+  const y=-1.12+j*(2.24/(loops-1));
+  const points=Array.from({length:161},(_,i)=>{
+   const a=i/160*Math.PI*2;
+   // Seção transversal elíptica maior que a coluna laminada:
+   // abraça a espessura X e toda a profundidade Z do pacote de chapas.
+   const rx=.48, rz=.84;
+   return new THREE.Vector3(rx*Math.cos(a),y+.012*Math.sin(a*2),rz*Math.sin(a));
+  });
+  const curve=new THREE.CatmullRomCurve3(points);
+  const mesh=new THREE.Mesh(new THREE.TubeGeometry(curve,176,.052,10,false),coilMat);
+  group.add(mesh);
+ }
+ // Pontos luminosos sobre o cobre indicam a oscilação da corrente alternada.
+ const glowMat=new THREE.MeshStandardMaterial({color:side==='p'?0xffb0a8:0x9bd8ff,emissive:side==='p'?0xff3828:0x168cff,emissiveIntensity:2.2});
+ for(let k=0;k<5;k++){
+  const bead=new THREE.Mesh(new THREE.SphereGeometry(.075,12,10),glowMat.clone());
+  group.add(bead);group.userData.voltageDots.push(bead);
+ }
+ // Terminais saem da parte superior e inferior de cada enrolamento.
+ const leadSide=side==='p'?-1:1;
+ for(const y of [-1.12,1.12]){
+  const points=[
+   new THREE.Vector3(x+leadSide*.10,y,0),
+   new THREE.Vector3(x+leadSide*.34,y+(y>0?.12:-.12),.08),
+   new THREE.Vector3(x+leadSide*.62,y+(y>0?.30:-.30),.08)
+  ];
+  const wire=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points),36,.045,8,false),mat);
+  root.add(wire);
+  const lug=new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,.07,24),new THREE.MeshStandardMaterial({color:0xc4cbd0,metalness:.9,roughness:.25}));
+  lug.rotation.x=Math.PI/2;lug.position.set(x+leadSide*.66,y+(y>0?.30:-.30),.08);root.add(lug);
+ }
+ return group;
+}
+let primary=coil('p',1000,copperRed),secondary=coil('s',500,copperBlue);
+const flowGroup=new THREE.Group();root.add(flowGroup);
+// O fluxo percorre o circuito magnético fechado do núcleo (pernas e jugos),
+// e não atravessa a janela pelo ar. Vista frontal: sentido horário.
+const fluxPoints=[
+ new THREE.Vector3(-2.08,1.84,.72),
+ new THREE.Vector3( 2.08,1.84,.72),
+ new THREE.Vector3( 2.08,-1.84,.72),
+ new THREE.Vector3(-2.08,-1.84,.72)
+];
+const fluxCurve=new THREE.LineCurve3(fluxPoints[0],fluxPoints[1]);
+const roundedFlux=new THREE.CatmullRomCurve3([
+ new THREE.Vector3(-2.08,1.84,.72),new THREE.Vector3(0,1.84,.72),
+ new THREE.Vector3(2.08,1.84,.72),new THREE.Vector3(2.08,0,.72),
+ new THREE.Vector3(2.08,-1.84,.72),new THREE.Vector3(0,-1.84,.72),
+ new THREE.Vector3(-2.08,-1.84,.72),new THREE.Vector3(-2.08,0,.72)
+],true,'catmullrom',0.08);
+const fluxLine=new THREE.Line( new THREE.BufferGeometry().setFromPoints(roundedFlux.getPoints(240)),
+ new THREE.LineDashedMaterial({color:0xffd43b,dashSize:.16,gapSize:.12,transparent:true,opacity:.95}));
+fluxLine.computeLineDistances();flowGroup.add(fluxLine);
+const fluxArrows=[];
+for(const u of [.12,.37,.62,.87]){
+ const pos=roundedFlux.getPointAt(u), tangent=roundedFlux.getTangentAt(u).normalize();
+ const arrow=new THREE.Mesh(new THREE.ConeGeometry(.105,.28,12),
+  new THREE.MeshBasicMaterial({color:0xffd43b,transparent:true,opacity:.95}));
+ arrow.position.copy(pos);
+ arrow.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),tangent);
+ flowGroup.add(arrow);fluxArrows.push(arrow);
+}
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(200,200),new THREE.MeshStandardMaterial({color:0x0a1b2a,roughness:.9}));floor.rotation.x=-Math.PI/2;floor.position.y=-2.55;scene.add(floor);
+let flowOn=true,voltageOn=true,spin=false,clock=new THREE.Clock();
+function resize(){const r=canvas.getBoundingClientRect();renderer.setSize(r.width,r.height,false);camera.aspect=r.width/r.height;camera.updateProjectionMatrix()}new ResizeObserver(resize).observe(canvas);resize();
+
+const scopeCanvas=$('scopeCanvas'),scopeCtx=scopeCanvas.getContext('2d');
+$('scopeMin').onclick=()=>{
+ const win=$('scopeWindow');win.classList.toggle('minimized');
+ $('scopeMin').textContent=win.classList.contains('minimized')?'+':'−';
+ requestAnimationFrame(()=>drawScope(clock.getElapsedTime()*5.2));
+};
+function drawScope(phase){
+ const rect=scopeCanvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2);
+ const w=Math.max(180,rect.width),h=Math.max(90,rect.height);
+ if(scopeCanvas.width!==Math.round(w*dpr)||scopeCanvas.height!==Math.round(h*dpr)){
+  scopeCanvas.width=Math.round(w*dpr);scopeCanvas.height=Math.round(h*dpr);
+ }
+ scopeCtx.setTransform(dpr,0,0,dpr,0,0);
+ scopeCtx.clearRect(0,0,w,h);
+ scopeCtx.fillStyle='#06131b';scopeCtx.fillRect(0,0,w,h);
+ const left=42,right=w-14,top=12,bottom=h-20,pw=right-left,ph=bottom-top;
+ // Grade principal e subdivisões do osciloscópio.
+ scopeCtx.lineWidth=1;
+ for(let i=0;i<=10;i++){
+  const x=left+pw*i/10;scopeCtx.strokeStyle=i===5?'#476276':'#1b3545';
+  scopeCtx.beginPath();scopeCtx.moveTo(x,top);scopeCtx.lineTo(x,bottom);scopeCtx.stroke();
+ }
+ for(let i=0;i<=8;i++){
+  const y=top+ph*i/8;scopeCtx.strokeStyle=i===4?'#476276':'#1b3545';
+  scopeCtx.beginPath();scopeCtx.moveTo(left,y);scopeCtx.lineTo(right,y);scopeCtx.stroke();
+ }
+ scopeCtx.fillStyle='#91aabd';scopeCtx.font='10px system-ui';scopeCtx.textAlign='right';
+ ['+100%','+50%','0','−50%','−100%'].forEach((v,i)=>scopeCtx.fillText(v,left-7,top+ph*(i*2)/8+3));
+ const v1=Math.max(.001,Number($('v1').value)||220),n1=Math.max(1,Number($('n1').value)||1000),n2=Math.max(1,Number($('n2').value)||500),v2=v1*n2/n1;
+ const maxV=Math.max(v1,v2)*1.12;
+ function trace(color,fn,scale=1){
+  scopeCtx.beginPath();scopeCtx.strokeStyle=color;scopeCtx.lineWidth=2.3;scopeCtx.shadowColor=color;scopeCtx.shadowBlur=5;
+  for(let i=0;i<=pw;i++){
+   const u=i/pw,theta=phase-u*Math.PI*4;
+   const val=fn(theta)*scale;
+   const y=top+ph/2-val*(ph*.46);
+   if(i===0)scopeCtx.moveTo(left+i,y);else scopeCtx.lineTo(left+i,y);
+  }
+  scopeCtx.stroke();scopeCtx.shadowBlur=0;
+ }
+ // Osciloscópio monofásico: CH1 mede a tensão no primário e CH2 no secundário.
+ // As duas tensões são exibidas com a mesma referência de fase (convenção dos pontos).
+ trace('#ff665f',a=>Math.sin(a),v1/maxV);
+ trace('#45a9ff',a=>Math.sin(a),v2/maxV);
+ $('scopeV1').textContent=v1.toLocaleString('pt-BR',{maximumFractionDigits:1})+' V';
+ $('scopeV2').textContent=v2.toLocaleString('pt-BR',{maximumFractionDigits:1})+' V';
+ $('scopeFreq').textContent='60 Hz';
+}
+
+function animate(){
+ requestAnimationFrame(animate);
+ const t=clock.getElapsedTime(), phase=t*5.2;
+ // Atualiza o osciloscópio a cada quadro, usando a mesma fase da animação 3D.
+ drawScope(phase);
+ const flux=Math.sin(phase), fluxStrength=Math.abs(flux);
+ controls.update();
+
+ // Núcleo: brilho acompanha a intensidade do fluxo magnético.
+ metal.emissiveIntensity=flowOn?(.08+.62*fluxStrength):.08;
+ if(flowOn){
+  flowGroup.visible=true;
+  fluxLine.material.dashOffset=-(phase*0.16);
+  const reverse=flux<0;
+  fluxArrows.forEach((a,i)=>{
+   const tangent=roundedFlux.getTangentAt([.12,.37,.62,.87][i]).normalize();
+   a.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),tangent);
+   if(reverse)a.rotateZ(Math.PI);
+   a.material.opacity=.25+.7*fluxStrength;
+  });
+ }else flowGroup.visible=false;
+
+ // Bobinas: mesma frequência da variação de fluxo; a tensão induzida
+ // acompanha dΦ/dt, portanto fica defasada de 90° em relação ao fluxo.
+ if(voltageOn){
+  [primary,secondary].forEach((g,idx)=>{
+   const induced=Math.cos(phase); // tensão induzida proporcional à derivada do fluxo
+   const polarity=idx===0?1:-1;   // polaridade ilustrativa entre enrolamentos
+   const signal=induced*polarity;
+   g.userData.voltageMaterial.emissiveIntensity=.18+1.15*Math.abs(signal);
+   g.userData.voltageDots.forEach((dot,k)=>{
+    const y=-1.02+k*.51;
+    const a=phase*(signal>=0?1:-1)+k*1.15+idx*Math.PI;
+    dot.position.set(.49*Math.cos(a),y,.85*Math.sin(a));
+    dot.material.emissiveIntensity=.35+3.0*Math.abs(signal);
+    dot.visible=true;
+   });
+  });
+ }else{
+  [primary,secondary].forEach(g=>{
+   g.userData.voltageMaterial.emissiveIntensity=.15;
+   g.userData.voltageDots.forEach(d=>d.visible=false);
+  });
+ }
+ if(spin)root.rotation.y+=.003;
+ renderer.render(scene,camera);
+}
+animate();
+function update(){
+ const v=Number($('v1').value),n1=Math.floor(Number($('n1').value)),n2=Math.floor(Number($('n2').value));
+ if(!(v>0&&n1>0&&n2>0&&Number.isFinite(v+n1+n2))){$('outV2').textContent='—';$('kind').textContent='Valores inválidos';$('formula').textContent='Informe valores maiores que zero.';return}
+ const v2=v*n2/n1,ratio=n2/n1,delta=(ratio-1)*100;
+ $('outV1').textContent=v.toLocaleString('pt-BR',{maximumFractionDigits:2})+' V';$('outV2').textContent=v2.toLocaleString('pt-BR',{maximumFractionDigits:2})+' V';
+ $('outN1').textContent=n1.toLocaleString('pt-BR')+' espiras no primário';$('outN2').textContent=n2.toLocaleString('pt-BR')+' espiras no secundário';
+ const kind=ratio>1.000001?'Elevador':ratio<.999999?'Abaixador':'Isolador';$('kind').textContent=kind;$('ratio').textContent='Relação de transformação: '+(n1/n2).toLocaleString('pt-BR',{maximumFractionDigits:2})+' : 1';
+ $('turnRatio').textContent=ratio.toLocaleString('pt-BR',{maximumFractionDigits:3});$('variation').textContent=(delta>0?'+':'')+delta.toLocaleString('pt-BR',{maximumFractionDigits:1})+'%';
+ $('formula').innerHTML='V₂ = V₁ × (N₂ / N₁)<br>V₂ = '+v.toLocaleString('pt-BR')+' × ('+n2.toLocaleString('pt-BR')+' / '+n1.toLocaleString('pt-BR')+') = <b>'+v2.toLocaleString('pt-BR',{maximumFractionDigits:2})+' V</b>';
+ // Coil turns are represented proportionally but capped to preserve readability.
+ root.remove(primary);root.remove(secondary);primary=coil('p',n1,copperRed);secondary=coil('s',n2,copperBlue);
+}
+['v1','n1','n2'].forEach(id=>$(id).addEventListener('input',update));$('calculate').onclick=update;
+$('reset').onclick=()=>{$('v1').value=220;$('n1').value=1000;$('n2').value=500;update()};
+$('rotate').onclick=()=>spin=!spin;$('flow').onclick=()=>{flowOn=!flowOn;$('flow').textContent='◉ Fluxo magnético: '+(flowOn?'ligado':'desligado')};$('voltage').onclick=()=>{voltageOn=!voltageOn;$('voltage').textContent='ϟ Tensão nas bobinas: '+(voltageOn?'ligada':'desligada')};
+$('homeView').onclick=()=>{camera.position.set(7.2,5.2,8.6);controls.target.set(0,0,0);controls.minDistance=5;controls.maxDistance=24;controls.update();root.rotation.set(0,0,0);spin=false};
+update();
+</script>
+</body></html>
